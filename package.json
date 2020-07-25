@@ -9,8 +9,13 @@
     "tsc:watch": "tsc --watch"
   },
   "dependencies": {
-    "lit-html": "^1.0.0",
-    "lit-element": "^2.0.1"
+    "@material/mwc-drawer": "^0.17.2",
+    "@material/mwc-icon-button": "^0.17.2",
+    "@material/mwc-top-app-bar": "^0.17.2",
+    "@material/mwc-top-app-bar-fixed": "^0.17.2",
+    "@webcomponents/webcomponentsjs": "^2.4.4",
+    "lit-element": "^2.0.1",
+    "lit-html": "^1.0.0"
   },
   "devDependencies": {
     "@types/node": "13.11.1",

@@ -1,64 +1,45 @@
-import { LitElement, html, css, property } from 'lit-element';
+import { LitElement, html, css, property, customElement } from 'lit-element';
+import '@material/mwc-top-app-bar';
+import '@material/mwc-drawer';
+import { Drawer } from '@material/mwc-drawer';
+import '@material/mwc-icon-button';
 
+@customElement('marzipan-ui')
 export class MarzipanUi extends LitElement {
 
   @property({ type: String }) page = 'main';
 
   @property({ type: String }) title = 'plop2';
 
-  static styles = css`
-    :host {
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: flex-start;
-      font-size: calc(10px + 2vmin);
-      color: #1a2b42;
-      max-width: 960px;
-      margin: 0 auto;
-      text-align: center;
-    }
-
-    main {
-      flex-grow: 1;
-    }
-
-    .app-footer {
-      font-size: calc(12px + 0.5vmin);
-      align-items: center;
-    }
-
-    .app-footer a {
-      margin-left: 5px;
-    }
-  `;
+  static styles = css``
 
   render() {
     return html`
-      <main>
-        <h1>My app</h1>
-        ${this.title}
-        <p>Edit <code>src/MarzipanUi.js</code> and save to reload.</p>
-        <a
-          class="app-link"
-          href="https://open-wc.org/developing/#code-examples"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Code examples
-        </a>
-      </main>
-
-      <p class="app-footer">
-        🚽 Made with love by
-        <a
-          target="_blank"
-          rel="noopener noreferrer"
-          href="https://github.com/open-wc"
-          >open-wc</a
-        >.
-      </p>
+    <main>
+      <mwc-drawer type="dismissible" id="drawer">
+        <div>
+          <p>Drawer Content!</p>
+        </div>
+        <div slot="appContent">
+          <mwc-top-app-bar id="appbar">
+            <mwc-icon-button slot="navigationIcon" icon="menu"></mwc-icon-button>
+            <div slot="title">Marzipan</div>
+          </mwc-top-app-bar>
+          <div>
+            <p>Main Content!</p>
+          </div>
+        </div>
+      </mwc-drawer>
+    </main>
     `;
+  }
+
+  firstUpdated(changedProperties: any) {
+    const drawer = <Drawer>this.shadowRoot?.getElementById("drawer");
+    if (drawer) {
+      this.shadowRoot?.addEventListener('MDCTopAppBar:nav', () => {
+        drawer.open = !drawer.open;
+      });
+    }
   }
 }
