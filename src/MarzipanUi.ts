@@ -8,10 +8,6 @@ import '@material/mwc-textfield';
 import { Drawer } from '@material/mwc-drawer';
 import { __values } from 'tslib';
 
-interface Stringable {
-  toString(): string;
-}
-
 class WithDefault {
   private __value: string | undefined;
 
@@ -36,6 +32,12 @@ class WithDefault {
 class Parameters {
   public address = new WithDefault("http://localhost:8080");
   public left = new WithDefault("-2.0");
+  public right = new WithDefault("1.0");
+  public top = new WithDefault("1.0");
+  public bottom = new WithDefault("-1.0");
+  public width = new WithDefault("900");
+  public height = new WithDefault("600");
+  public maxiter = new WithDefault("100");
 
   private __values(): Record<string, string> {
     let values: Record<string, string> = {};
@@ -99,12 +101,6 @@ class Parameters {
 export class MarzipanUi extends LitElement {
 
   @property({ type: String })
-  page = 'main';
-
-  @property({ type: String })
-  title = 'plop2';
-
-  @property({ type: String })
   private targetURL = '';
 
   private params = new Parameters();
@@ -124,7 +120,23 @@ export class MarzipanUi extends LitElement {
         <div>
           <h4>Position</h4>
           <div>
-            <mwc-textfield label="Left" value="${ifDefined(this.params.left.get())}" endaligned @change="${this.handleLeft}"></mwc-textfield>
+            <mwc-textfield label="Left" name="left" value="${this.params.left.get()}" endaligned @change="${this.handleChange}"></mwc-textfield>
+            <mwc-textfield label="Right" name="right" value="${this.params.right.get()}" endaligned @change="${this.handleChange}"></mwc-textfield>
+            <mwc-textfield label="Top" name="top" value="${this.params.top.get()}" endaligned @change="${this.handleChange}"></mwc-textfield>
+            <mwc-textfield label="Bottom" name="bottom" value="${this.params.bottom.get()}" endaligned @change="${this.handleChange}"></mwc-textfield>
+          </div>
+          <h4>Image size</h4>
+          <div>
+            <mwc-textfield label="Width" name="width" value="${this.params.width.get()}" endaligned @change="${this.handleChange}"></mwc-textfield>
+            <mwc-textfield label="Height" name="height" value="${this.params.height.get()}" endaligned @change="${this.handleChange}"></mwc-textfield>
+          </div>
+          <h4>Rendering</h4>
+          <div>
+            <mwc-textfield label="Max iterations" name="maxiter" value="${this.params.maxiter.get()}" endaligned @change="${this.handleChange}"></mwc-textfield>
+          </div>
+          <h4>Network</h4>
+          <div>
+            <mwc-textfield label="Address" name="address" value="${this.params.address.get()}" @change="${this.handleChange}"></mwc-textfield>
           </div>
         </div>
         <div slot="appContent">
@@ -149,11 +161,15 @@ export class MarzipanUi extends LitElement {
     });
   }
 
-  handleLeft(event: Event) {
+  handleChange(event: Event) {
     if (!event.target) { return }
-    const value = (event.target as HTMLInputElement).value
-    this.params.left.set(value);
-    this.updateURL();
+    const name = (event.target as HTMLInputElement).name;
+    const value = (event.target as HTMLInputElement).value;
+    const prop = this.params[name as (keyof Parameters)];
+    if (prop instanceof WithDefault) {
+      prop.set(value);
+      this.updateURL();
+    }
   }
 
   updateURL() {
