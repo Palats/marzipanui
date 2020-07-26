@@ -9,27 +9,42 @@ import '@material/mwc-icon';
 import { Drawer } from '@material/mwc-drawer';
 
 
+// Encapsulate a string value which can be unset & have a default value.
 class WithDefault {
   private __value: string | undefined;
 
   constructor(private __default: string) { }
+
+  // get the value or, if undefined, the default value.
   get(): string {
     if (this.__value === undefined) {
       return this.__default;
     }
     return this.__value;
   }
-  set(v: string) {
-    this.__value = v;
-  }
+
+  // Return the value if defined, undefined otherwise.
   maybe(): (string | undefined) {
     return this.__value;
   }
+
+  // Get the default value, no matter the current value.
   default(): string {
     return this.__default;
   }
+
+  // Set the value.
+  set(v: string) {
+    this.__value = v;
+  }
+
+  // Unset the value.
+  reset() {
+    this.__value = undefined;
+  }
 }
 
+// Hold all parameters that Marzipan can accept.
 class Parameters {
   public address = new WithDefault("http://localhost:8080");
   public left = new WithDefault("-2.0");
@@ -40,6 +55,8 @@ class Parameters {
   public height = new WithDefault("600");
   public maxiter = new WithDefault("100");
 
+  // Returns all parameters with their values. If the value has not been
+  // explictly set, the default value will be used.
   private __values(): Record<string, string> {
     let values: Record<string, string> = {};
     for (const name of Object.getOwnPropertyNames(this)) {
@@ -52,6 +69,7 @@ class Parameters {
     return values;
   }
 
+  // Returns all parameter which have an explicit value.
   private __maybe_values(): Record<string, string> {
     let values: Record<string, string> = {};
     for (const name of Object.getOwnPropertyNames(this)) {
@@ -81,6 +99,7 @@ class Parameters {
     return this.address.get() + '?' + q.toString();
   }
 
+  // Set the parameters based on the provided query parameters.
   from(p: URLSearchParams) {
     let params = new URLSearchParams(document.location.search);
     let values: Record<string, string> = {};
@@ -101,6 +120,7 @@ class Parameters {
 @customElement('marzipan-ui')
 export class MarzipanUi extends LitElement {
 
+  // Current URL for loading the fractal image.
   @property({ type: String })
   private targetURL = '';
 
@@ -202,6 +222,7 @@ export class MarzipanUi extends LitElement {
   }
 
   firstUpdated(changedProperties: any) {
+    // Open the drawer by default and connect the corresponding button to it.
     const drawer = this.shadowRoot?.getElementById('drawer') as Drawer;
     drawer.open = true;
     this.shadowRoot?.addEventListener('MDCTopAppBar:nav', () => {
@@ -209,6 +230,7 @@ export class MarzipanUi extends LitElement {
     });
   }
 
+  // Called by the various input elements when their value changes.
   handleChange(event: Event) {
     if (!event.target) { return }
     const name = (event.target as HTMLInputElement).name;
@@ -220,6 +242,7 @@ export class MarzipanUi extends LitElement {
     }
   }
 
+  // Start refresh the image.
   updateURL() {
     this.targetURL = this.params.url();
     history.pushState(null, "", '?' + this.params.query());
