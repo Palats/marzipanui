@@ -21,7 +21,7 @@ import { LinearProgress } from '@material/mwc-linear-progress';
 class WithDefault {
   private __value: string | undefined;
 
-  constructor(public caption: string, private __default: string) { }
+  constructor(public caption: string, private __default: string, private event?: EventTarget) { }
 
   // get the value or, if undefined, the default value.
   get(): string {
@@ -44,11 +44,17 @@ class WithDefault {
   // Set the value.
   set(v: string) {
     this.__value = v;
+    if (this.event) {
+      this.event.dispatchEvent(new CustomEvent("mui-value-change", { bubbles: true }));
+    }
   }
 
   // Unset the value.
   reset() {
     this.__value = undefined;
+    if (this.event) {
+      this.event.dispatchEvent(new CustomEvent("mui-value-change", { bubbles: true }));
+    }
   }
 }
 
@@ -88,14 +94,16 @@ class DataField extends LitElement {
 
 // Hold all parameters that Marzipan can accept.
 class Parameters {
-  public address = new WithDefault("Address", "http://localhost:8080");
-  public left = new WithDefault("Left", "-2.0");
-  public right = new WithDefault("Right", "1.0");
-  public top = new WithDefault("Top", "1.0");
-  public bottom = new WithDefault("Bottom", "-1.0");
-  public width = new WithDefault("Width", "900");
-  public height = new WithDefault("Height", "600");
-  public maxiter = new WithDefault("Max iterations", "100");
+  public address = new WithDefault("Address", "http://localhost:8080", this.event);
+  public left = new WithDefault("Left", "-2.0", this.event);
+  public right = new WithDefault("Right", "1.0", this.event);
+  public top = new WithDefault("Top", "1.0", this.event);
+  public bottom = new WithDefault("Bottom", "-1.0", this.event);
+  public width = new WithDefault("Width", "900", this.event);
+  public height = new WithDefault("Height", "600", this.event);
+  public maxiter = new WithDefault("Max iterations", "100", this.event);
+
+  constructor(private event?: EventTarget) { }
 
   // Returns all parameters with their values. If the value has not been
   // explictly set, the default value will be used.
@@ -176,7 +184,7 @@ export class MarzipanUi extends LitElement {
   @query('#progress')
   private progress: LinearProgress | undefined;
 
-  private params: Parameters;
+  private params: Parameters = new Parameters(this);
 
   static styles = css`
     .imgscale {
@@ -186,7 +194,9 @@ export class MarzipanUi extends LitElement {
   `
   constructor() {
     super();
-    this.params = new Parameters();
+    this.addEventListener('mui-value-change', () => {
+      this.updateURL();
+    })
     this.params.from(new URLSearchParams(document.location.search));
     this.updateURL();
   }
@@ -287,11 +297,6 @@ export class MarzipanUi extends LitElement {
     this.shadowRoot?.addEventListener('MDCTopAppBar:nav', () => {
       drawer.open = !drawer.open;
     });
-    this.shadowRoot?.addEventListener('mui-value-change', () => {
-      this.updateURL();
-    })
-
-    this.updateURL();
   }
 
   // Start refresh the image.
