@@ -59,6 +59,7 @@ abstract class Container<T> {
 
   abstract fromString(v: string): T;
   abstract toString(v: T): string;
+  abstract validate(s: string): boolean;
 
   getAsString(): string { return this.toString(this.get()); }
   maybeAsString(): string | undefined {
@@ -75,26 +76,35 @@ abstract class Container<T> {
 class StringContainer extends Container<string> {
   fromString(v: string): string { return v; }
   toString(v: string): string { return v; }
+  validate(s: string): boolean { return true; }
+
+  newElement() { return new EditString(this); }
 }
 
 class FloatContainer extends Container<number> {
   fromString(v: string): number { return parseFloat(v); }
   toString(v: number): string { return v.toString(); }
+  validate(s: string): boolean {
+    return !isNaN(parseFloat(s));
+  }
+
+  newElement() { return new EditNumber(this); }
 }
 
 class PositiveIntContainer extends Container<number> {
   fromString(v: string): number { return parseInt(v, 10); }
   toString(v: number): string { return v.toString(); }
+  validate(s: string) {
+    const v = parseInt(s, 10);
+    return s == "" || (!isNaN(v) && v > 0)
+  }
+
+  newElement() { return new EditNumber(this); }
 }
 
-@customElement('mui-data-field')
-class DataField<T> extends LitElement {
-  data: Container<T>;
-
-  constructor(data: Container<T>) {
-    super();
-    this.data = data;
-  }
+@customElement('mui-edit-number')
+class EditNumber<T> extends LitElement {
+  constructor(public data: Container<T>) { super(); }
 
   render() {
     return html`
@@ -104,7 +114,41 @@ class DataField<T> extends LitElement {
         value="${ifDefined(this.data.maybeAsString())}"
         @change="${this.handleChange}"
         type="number"
+        .validityTransform="${(s: string) => this.validity(s)}"
         endaligned>
+      </mwc-textfield>
+    `;
+  }
+
+  validity(s: string): Partial<ValidityState> {
+    return {
+      valid: this.data.validate(s),
+    }
+  }
+
+  handleChange(event: Event) {
+    if (!event.target) { return }
+    const elt = event.target as HTMLInputElement;
+    if (!elt.validity.valid) {
+      console.log("invalid value");
+      return;
+    }
+    this.data.setFromString(elt.value);
+    this.dispatchEvent(new CustomEvent("mui-value-change", { bubbles: true }));
+  }
+}
+
+@customElement('mui-edit-string')
+class EditString<T> extends LitElement {
+  constructor(public data: Container<T>) { super(); }
+
+  render() {
+    return html`
+      <mwc-textfield
+        label="${this.data.caption}"
+        placeholder="${this.data.defaultAsString()}"
+        value="${ifDefined(this.data.maybeAsString())}"
+        @change="${this.handleChange}">
       </mwc-textfield>
     `;
   }
@@ -120,6 +164,7 @@ class DataField<T> extends LitElement {
     this.dispatchEvent(new CustomEvent("mui-value-change", { bubbles: true }));
   }
 }
+
 
 // Hold all parameters that Marzipan can accept.
 class Parameters {
@@ -246,10 +291,10 @@ export class MarzipanUi extends LitElement {
         <div>
           <h4>Position</h4>
           <div>
-            ${new DataField(this.params.left)}
-            ${new DataField(this.params.right)}
-            ${new DataField(this.params.top)}
-            ${new DataField(this.params.bottom)}
+            ${this.params.left.newElement()}
+            ${this.params.right.newElement()}
+            ${this.params.top.newElement()}
+            ${this.params.bottom.newElement()}
           </div>
           <h4>Rendering</h4>
           <div>
@@ -257,48 +302,13 @@ export class MarzipanUi extends LitElement {
               <mwc-switch ?checked="${this.autoscale}" @change="${this.handleAutoscale}"></mwc-switch>
             </mwc-formfield>
             <p></p>
-            <mwc-textfield
-              label="Max iterations" name="maxiter"
-              placeholder="${this.params.maxiter.default()}"
-              value="${ifDefined(this.params.maxiter.maybe())}"
-              @change="${this.handleChange}"
-              helper="Max iterations per pixel"
-              autoValidate
-              .validityTransform="${this.validityPositiveInt}"
-              validationMessage="Must be a positive integer"
-              endaligned>
-            </mwc-textfield>
-            <mwc-textfield
-              label="Width" name="width"
-              placeholder="${this.params.width.default()}"
-              value="${ifDefined(this.params.width.maybe())}"
-              @change="${this.handleChange}"
-              helper="Horizontal pixels to render"
-              autoValidate
-              .validityTransform="${this.validityPositiveInt}"
-              validationMessage="Must be a positive integer"
-              endaligned>
-            </mwc-textfield>
-            <mwc-textfield
-              label="Height" name="height"
-              placeholder="${this.params.height.default()}"
-              value="${ifDefined(this.params.height.maybe())}"
-              @change="${this.handleChange}"
-              helper="Vertical pixels to render"
-              autoValidate
-              .validityTransform="${this.validityPositiveInt}"
-              validationMessage="Must be a positive integer"
-              endaligned>
-            </mwc-textfield>
+            ${this.params.maxiter.newElement()}
+            ${this.params.width.newElement()}
+            ${this.params.height.newElement()}
           </div>
           <h4>Network</h4>
           <div>
-            <mwc-textfield
-              label="Address" name="address"
-              placeholder="${this.params.address.default()}"
-              value="${ifDefined(this.params.address.maybe())}"
-              @change="${this.handleChange}">
-            </mwc-textfield>
+            ${this.params.address.newElement()}
           </div>
         </div>
 
@@ -366,29 +376,7 @@ export class MarzipanUi extends LitElement {
     }
   }
 
-  // Called by the various input elements when their value changes.
-  handleChange(event: Event) {
-    if (!event.target) { return }
-    const elt = event.target as HTMLInputElement;
-    if (!elt.validity.valid) {
-      console.log("invalid value");
-      return;
-    }
-    const prop = this.params[elt.name as (keyof Parameters)];
-    if (prop instanceof Container) {
-      prop.setFromString(elt.value);
-      this.updateURL();
-    }
-  }
-
   handleAutoscale(event: Event) {
     this.autoscale = !this.autoscale;
-  }
-
-  validityPositiveInt(newValue: string): Partial<ValidityState> {
-    const v = parseInt(newValue, 10);
-    return {
-      valid: newValue == "" || (!isNaN(v) && v > 0),
-    }
   }
 }
