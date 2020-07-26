@@ -15,6 +15,7 @@ import '@material/mwc-linear-progress';
 import { Snackbar } from '@material/mwc-snackbar';
 import { Drawer } from '@material/mwc-drawer';
 import { LinearProgress } from '@material/mwc-linear-progress';
+import { TextField } from '@material/mwc-textfield';
 
 
 // Encapsulate a string value which can be unset & have a default value.
@@ -106,15 +107,20 @@ class PositiveIntContainer extends Container<number> {
 class EditNumber<T> extends LitElement {
   constructor(public data: Container<T>) { super(); }
 
+  @query('#field')
+  field: TextField | undefined;
+
   render() {
     return html`
       <mwc-textfield
+        id='field'
         label="${this.data.caption}"
         placeholder="${this.data.defaultAsString()}"
         value="${ifDefined(this.data.maybeAsString())}"
         @change="${this.handleChange}"
         type="number"
         .validityTransform="${(s: string) => this.validity(s)}"
+        validationMessage="Invalid value"
         endaligned>
       </mwc-textfield>
     `;
@@ -127,13 +133,11 @@ class EditNumber<T> extends LitElement {
   }
 
   handleChange(event: Event) {
-    if (!event.target) { return }
-    const elt = event.target as HTMLInputElement;
-    if (!elt.validity.valid) {
+    if (!this.field || !this.field.validity.valid) {
       console.log("invalid value");
       return;
     }
-    this.data.setFromString(elt.value);
+    this.data.setFromString(this.field.value);
     this.dispatchEvent(new CustomEvent("mui-value-change", { bubbles: true }));
   }
 }
@@ -142,9 +146,13 @@ class EditNumber<T> extends LitElement {
 class EditString<T> extends LitElement {
   constructor(public data: Container<T>) { super(); }
 
+  @query('#field')
+  field: TextField | undefined;
+
   render() {
     return html`
       <mwc-textfield
+        id='field'
         label="${this.data.caption}"
         placeholder="${this.data.defaultAsString()}"
         value="${ifDefined(this.data.maybeAsString())}"
@@ -154,13 +162,11 @@ class EditString<T> extends LitElement {
   }
 
   handleChange(event: Event) {
-    if (!event.target) { return }
-    const elt = event.target as HTMLInputElement;
-    if (!elt.validity.valid) {
+    if (!this.field || !this.field.validity.valid) {
       console.log("invalid value");
       return;
     }
-    this.data.setFromString(elt.value);
+    this.data.setFromString(this.field.value);
     this.dispatchEvent(new CustomEvent("mui-value-change", { bubbles: true }));
   }
 }
