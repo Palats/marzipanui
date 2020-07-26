@@ -5,8 +5,9 @@ import '@material/mwc-top-app-bar';
 import '@material/mwc-drawer';
 import '@material/mwc-icon-button';
 import '@material/mwc-textfield';
+import '@material/mwc-icon';
 import { Drawer } from '@material/mwc-drawer';
-import { __values } from 'tslib';
+
 
 class WithDefault {
   private __value: string | undefined;
@@ -22,10 +23,10 @@ class WithDefault {
     this.__value = v;
   }
   maybe(): (string | undefined) {
-    if (this.__value === undefined) {
-      return undefined;
-    }
     return this.__value;
+  }
+  default(): string {
+    return this.__default;
   }
 }
 
@@ -120,23 +121,70 @@ export class MarzipanUi extends LitElement {
         <div>
           <h4>Position</h4>
           <div>
-            <mwc-textfield label="Left" name="left" value="${this.params.left.get()}" endaligned @change="${this.handleChange}"></mwc-textfield>
-            <mwc-textfield label="Right" name="right" value="${this.params.right.get()}" endaligned @change="${this.handleChange}"></mwc-textfield>
-            <mwc-textfield label="Top" name="top" value="${this.params.top.get()}" endaligned @change="${this.handleChange}"></mwc-textfield>
-            <mwc-textfield label="Bottom" name="bottom" value="${this.params.bottom.get()}" endaligned @change="${this.handleChange}"></mwc-textfield>
+            <mwc-textfield
+              label="Left" name="left"
+              placeholder="${this.params.left.default()}"
+              value="${ifDefined(this.params.left.maybe())}"
+              @change="${this.handleChange}"
+              endaligned>
+            </mwc-textfield>
+            <mwc-textfield
+              label="Right" name="right"
+              placeholder="${this.params.right.default()}"
+              value="${ifDefined(this.params.right.maybe())}"
+              @change="${this.handleChange}"
+              endaligned>
+            </mwc-textfield>
+            <mwc-textfield
+              label="Top" name="top"
+              placeholder="${this.params.top.default()}"
+              value="${ifDefined(this.params.top.maybe())}"
+              @change="${this.handleChange}"
+              endaligned>
+            </mwc-textfield>
+            <mwc-textfield
+              label="Bottom" name="bottom"
+              placeholder="${this.params.bottom.default()}"
+              value="${ifDefined(this.params.bottom.maybe())}"
+              @change="${this.handleChange}"
+              endaligned>
+            </mwc-textfield>
           </div>
           <h4>Image size</h4>
           <div>
-            <mwc-textfield label="Width" name="width" value="${this.params.width.get()}" endaligned @change="${this.handleChange}"></mwc-textfield>
-            <mwc-textfield label="Height" name="height" value="${this.params.height.get()}" endaligned @change="${this.handleChange}"></mwc-textfield>
+          <mwc-textfield
+              label="Width" name="width"
+              placeholder="${this.params.width.default()}"
+              value="${ifDefined(this.params.width.maybe())}"
+              @change="${this.handleChange}"
+              endaligned>
+            </mwc-textfield>
+            <mwc-textfield
+              label="Height" name="height"
+              placeholder="${this.params.height.default()}"
+              value="${ifDefined(this.params.height.maybe())}"
+              @change="${this.handleChange}"
+              endaligned>
+            </mwc-textfield>
           </div>
           <h4>Rendering</h4>
           <div>
-            <mwc-textfield label="Max iterations" name="maxiter" value="${this.params.maxiter.get()}" endaligned @change="${this.handleChange}"></mwc-textfield>
+            <mwc-textfield
+              label="Max iterations" name="maxiter"
+              placeholder="${this.params.maxiter.default()}"
+              value="${ifDefined(this.params.maxiter.maybe())}"
+              @change="${this.handleChange}"
+              endaligned>
+            </mwc-textfield>
           </div>
           <h4>Network</h4>
           <div>
-            <mwc-textfield label="Address" name="address" value="${this.params.address.get()}" @change="${this.handleChange}"></mwc-textfield>
+            <mwc-textfield
+              label="Address" name="address"
+              placeholder="${this.params.address.default()}"
+              value="${ifDefined(this.params.address.maybe())}"
+              @change="${this.handleChange}">
+            </mwc-textfield>
           </div>
         </div>
         <div slot="appContent">
