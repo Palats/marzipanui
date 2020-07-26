@@ -21,7 +21,7 @@ import { LinearProgress } from '@material/mwc-linear-progress';
 class WithDefault {
   private __value: string | undefined;
 
-  constructor(private __default: string) { }
+  constructor(public caption: string, private __default: string) { }
 
   // get the value or, if undefined, the default value.
   get(): string {
@@ -52,16 +52,50 @@ class WithDefault {
   }
 }
 
+@customElement('mui-data-field')
+class DataField extends LitElement {
+  data: WithDefault;
+
+  constructor(data: WithDefault) {
+    super();
+    this.data = data;
+  }
+
+  render() {
+    return html`
+      <mwc-textfield
+        label="${this.data.caption}"
+        placeholder="${this.data.default()}"
+        value="${ifDefined(this.data.maybe())}"
+        @change="${this.handleChange}"
+        type="number"
+        endaligned>
+      </mwc-textfield>
+    `;
+  }
+
+  handleChange(event: Event) {
+    if (!event.target) { return }
+    const elt = event.target as HTMLInputElement;
+    if (!elt.validity.valid) {
+      console.log("invalid value");
+      return;
+    }
+    this.data.set(elt.value);
+    this.dispatchEvent(new CustomEvent("mui-value-change", { bubbles: true }));
+  }
+}
+
 // Hold all parameters that Marzipan can accept.
 class Parameters {
-  public address = new WithDefault("http://localhost:8080");
-  public left = new WithDefault("-2.0");
-  public right = new WithDefault("1.0");
-  public top = new WithDefault("1.0");
-  public bottom = new WithDefault("-1.0");
-  public width = new WithDefault("900");
-  public height = new WithDefault("600");
-  public maxiter = new WithDefault("100");
+  public address = new WithDefault("Address", "http://localhost:8080");
+  public left = new WithDefault("Left", "-2.0");
+  public right = new WithDefault("Right", "1.0");
+  public top = new WithDefault("Top", "1.0");
+  public bottom = new WithDefault("Bottom", "-1.0");
+  public width = new WithDefault("Width", "900");
+  public height = new WithDefault("Height", "600");
+  public maxiter = new WithDefault("Max iterations", "100");
 
   // Returns all parameters with their values. If the value has not been
   // explictly set, the default value will be used.
@@ -142,7 +176,7 @@ export class MarzipanUi extends LitElement {
   @query('#progress')
   private progress: LinearProgress | undefined;
 
-  private params = new Parameters();
+  private params: Parameters;
 
   static styles = css`
     .imgscale {
@@ -152,50 +186,24 @@ export class MarzipanUi extends LitElement {
   `
   constructor() {
     super();
+    this.params = new Parameters();
     this.params.from(new URLSearchParams(document.location.search));
     this.updateURL();
   }
 
   render() {
     const imgclasses = { imgscale: this.autoscale };
+
     return html`
     <main>
       <mwc-drawer type="dismissible" id="drawer">
         <div>
           <h4>Position</h4>
           <div>
-            <mwc-textfield
-              label="Left" name="left"
-              placeholder="${this.params.left.default()}"
-              value="${ifDefined(this.params.left.maybe())}"
-              @change="${this.handleChange}"
-              type="number"
-              endaligned>
-            </mwc-textfield>
-            <mwc-textfield
-              label="Right" name="right"
-              placeholder="${this.params.right.default()}"
-              value="${ifDefined(this.params.right.maybe())}"
-              @change="${this.handleChange}"
-              type="number"
-              endaligned>
-            </mwc-textfield>
-            <mwc-textfield
-              label="Top" name="top"
-              placeholder="${this.params.top.default()}"
-              value="${ifDefined(this.params.top.maybe())}"
-              @change="${this.handleChange}"
-              type="number"
-              endaligned>
-            </mwc-textfield>
-            <mwc-textfield
-              label="Bottom" name="bottom"
-              placeholder="${this.params.bottom.default()}"
-              value="${ifDefined(this.params.bottom.maybe())}"
-              @change="${this.handleChange}"
-              type="number"
-              endaligned>
-            </mwc-textfield>
+            ${new DataField(this.params.left)}
+            ${new DataField(this.params.right)}
+            ${new DataField(this.params.top)}
+            ${new DataField(this.params.bottom)}
           </div>
           <h4>Rendering</h4>
           <div>
@@ -279,6 +287,9 @@ export class MarzipanUi extends LitElement {
     this.shadowRoot?.addEventListener('MDCTopAppBar:nav', () => {
       drawer.open = !drawer.open;
     });
+    this.shadowRoot?.addEventListener('mui-value-change', () => {
+      this.updateURL();
+    })
 
     this.updateURL();
   }
