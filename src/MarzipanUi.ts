@@ -1,4 +1,4 @@
-import { LitElement, html, css, property, customElement } from 'lit-element';
+import { LitElement, html, css, property, customElement, query } from 'lit-element';
 import { ifDefined } from 'lit-html/directives/if-defined';
 import { classMap } from 'lit-html/directives/class-map.js';
 
@@ -9,7 +9,12 @@ import '@material/mwc-textfield';
 import '@material/mwc-icon';
 import '@material/mwc-switch';
 import '@material/mwc-formfield';
+import '@material/mwc-snackbar';
+import '@material/mwc-linear-progress';
+
+import { Snackbar } from '@material/mwc-snackbar';
 import { Drawer } from '@material/mwc-drawer';
+import { LinearProgress } from '@material/mwc-linear-progress';
 
 
 // Encapsulate a string value which can be unset & have a default value.
@@ -131,8 +136,13 @@ export class MarzipanUi extends LitElement {
   @property({ type: Boolean })
   private autoscale = true;
 
-  private params = new Parameters();
+  @query('#imgError')
+  private imgError: Snackbar | undefined;
 
+  @query('#progress')
+  private progress: LinearProgress | undefined;
+
+  private params = new Parameters();
 
   static styles = css`
     .imgscale {
@@ -140,7 +150,6 @@ export class MarzipanUi extends LitElement {
       height: auto;
     }
   `
-
   constructor() {
     super();
     this.params.from(new URLSearchParams(document.location.search));
@@ -245,11 +254,21 @@ export class MarzipanUi extends LitElement {
             <div slot="title">Marzipan</div>
           </mwc-top-app-bar>
           <div>
-            <img src="${this.targetURL}" class=${classMap(imgclasses)} alt="generated fractal" id="render"/>
+            <img
+              src="${this.targetURL}"
+              class=${classMap(imgclasses)}
+              alt="generated fractal"
+              @load="${this.handleImgLoad}"
+              @error="${this.handleImgError}"
+            />
           </div>
         </div>
       </mwc-drawer>
     </main>
+    <mwc-linear-progress id="progress" indeterminate></mwc-linear-progress>
+    <mwc-snackbar id="imgError" labelText="Unable to load fractale image.">
+        <mwc-icon-button icon="close" slot="dismiss"></mwc-icon-button>
+    </mwc-snackbar>
     `;
   }
 
@@ -260,6 +279,39 @@ export class MarzipanUi extends LitElement {
     this.shadowRoot?.addEventListener('MDCTopAppBar:nav', () => {
       drawer.open = !drawer.open;
     });
+
+    this.updateURL();
+  }
+
+  // Start refresh the image.
+  updateURL() {
+    this.targetURL = this.params.url();
+    history.pushState(null, "", '?' + this.params.query());
+
+    if (this.imgError) {
+      this.imgError.close();
+    }
+    if (this.progress) {
+      this.progress.open();
+    }
+  }
+
+  handleImgLoad(event: Event) {
+    if (this.imgError) {
+      this.imgError.close();
+    }
+    if (this.progress) {
+      this.progress.close();
+    }
+  }
+
+  handleImgError(event: Event) {
+    if (this.imgError) {
+      this.imgError.show();
+    }
+    if (this.progress) {
+      this.progress.close();
+    }
   }
 
   // Called by the various input elements when their value changes.
@@ -279,12 +331,6 @@ export class MarzipanUi extends LitElement {
 
   handleAutoscale(event: Event) {
     this.autoscale = !this.autoscale;
-  }
-
-  // Start refresh the image.
-  updateURL() {
-    this.targetURL = this.params.url();
-    history.pushState(null, "", '?' + this.params.query());
   }
 
   validityPositiveInt(newValue: string): Partial<ValidityState> {
