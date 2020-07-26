@@ -18,13 +18,13 @@ import { LinearProgress } from '@material/mwc-linear-progress';
 
 
 // Encapsulate a string value which can be unset & have a default value.
-class WithDefault {
-  private __value: string | undefined;
+abstract class Container<T> {
+  private __value: T | undefined;
 
-  constructor(public caption: string, private __default: string, private event?: EventTarget) { }
+  constructor(public caption: string, private __default: T, private event?: EventTarget) { }
 
   // get the value or, if undefined, the default value.
-  get(): string {
+  get(): T {
     if (this.__value === undefined) {
       return this.__default;
     }
@@ -32,17 +32,17 @@ class WithDefault {
   }
 
   // Return the value if defined, undefined otherwise.
-  maybe(): (string | undefined) {
+  maybe(): (T | undefined) {
     return this.__value;
   }
 
   // Get the default value, no matter the current value.
-  default(): string {
+  default(): T {
     return this.__default;
   }
 
   // Set the value.
-  set(v: string) {
+  set(v: T) {
     this.__value = v;
     if (this.event) {
       this.event.dispatchEvent(new CustomEvent("mui-value-change", { bubbles: true }));
@@ -56,13 +56,42 @@ class WithDefault {
       this.event.dispatchEvent(new CustomEvent("mui-value-change", { bubbles: true }));
     }
   }
+
+  abstract fromString(v: string): T;
+  abstract toString(v: T): string;
+
+  getAsString(): string { return this.toString(this.get()); }
+  maybeAsString(): string | undefined {
+    const v = this.maybe();
+    if (v === undefined) {
+      return undefined;
+    }
+    return this.toString(v);
+  };
+  defaultAsString(): string { return this.toString(this.default()); }
+  setFromString(v: string): void { this.set(this.fromString(v)); }
+}
+
+class StringContainer extends Container<string> {
+  fromString(v: string): string { return v; }
+  toString(v: string): string { return v; }
+}
+
+class FloatContainer extends Container<number> {
+  fromString(v: string): number { return parseFloat(v); }
+  toString(v: number): string { return v.toString(); }
+}
+
+class PositiveIntContainer extends Container<number> {
+  fromString(v: string): number { return parseInt(v, 10); }
+  toString(v: number): string { return v.toString(); }
 }
 
 @customElement('mui-data-field')
-class DataField extends LitElement {
-  data: WithDefault;
+class DataField<T> extends LitElement {
+  data: Container<T>;
 
-  constructor(data: WithDefault) {
+  constructor(data: Container<T>) {
     super();
     this.data = data;
   }
@@ -71,8 +100,8 @@ class DataField extends LitElement {
     return html`
       <mwc-textfield
         label="${this.data.caption}"
-        placeholder="${this.data.default()}"
-        value="${ifDefined(this.data.maybe())}"
+        placeholder="${this.data.defaultAsString()}"
+        value="${ifDefined(this.data.maybeAsString())}"
         @change="${this.handleChange}"
         type="number"
         endaligned>
@@ -87,21 +116,21 @@ class DataField extends LitElement {
       console.log("invalid value");
       return;
     }
-    this.data.set(elt.value);
+    this.data.setFromString(elt.value);
     this.dispatchEvent(new CustomEvent("mui-value-change", { bubbles: true }));
   }
 }
 
 // Hold all parameters that Marzipan can accept.
 class Parameters {
-  public address = new WithDefault("Address", "http://localhost:8080", this.event);
-  public left = new WithDefault("Left", "-2.0", this.event);
-  public right = new WithDefault("Right", "1.0", this.event);
-  public top = new WithDefault("Top", "1.0", this.event);
-  public bottom = new WithDefault("Bottom", "-1.0", this.event);
-  public width = new WithDefault("Width", "900", this.event);
-  public height = new WithDefault("Height", "600", this.event);
-  public maxiter = new WithDefault("Max iterations", "100", this.event);
+  public address = new StringContainer("Address", "http://localhost:8080", this.event);
+  public left = new FloatContainer("Left", -2.0, this.event);
+  public right = new FloatContainer("Right", 1.0, this.event);
+  public top = new FloatContainer("Top", 1.0, this.event);
+  public bottom = new FloatContainer("Bottom", -1.0, this.event);
+  public width = new PositiveIntContainer("Width", 900, this.event);
+  public height = new PositiveIntContainer("Height", 600, this.event);
+  public maxiter = new PositiveIntContainer("Max iterations", 100, this.event);
 
   constructor(private event?: EventTarget) { }
 
@@ -111,10 +140,10 @@ class Parameters {
     let values: Record<string, string> = {};
     for (const name of Object.getOwnPropertyNames(this)) {
       const prop = this[name as (keyof Parameters)];
-      if (!(prop instanceof WithDefault)) {
+      if (!(prop instanceof Container)) {
         continue;
       }
-      values[name] = prop.get();
+      values[name] = prop.getAsString();
     }
     return values;
   }
@@ -124,10 +153,10 @@ class Parameters {
     let values: Record<string, string> = {};
     for (const name of Object.getOwnPropertyNames(this)) {
       const prop = this[name as (keyof Parameters)];
-      if (!(prop instanceof WithDefault)) {
+      if (!(prop instanceof Container)) {
         continue;
       }
-      let v = prop.maybe();
+      let v = prop.maybeAsString();
       if (v === undefined) {
         continue
       }
@@ -155,14 +184,14 @@ class Parameters {
     let values: Record<string, string> = {};
     for (const name of Object.getOwnPropertyNames(this)) {
       const prop = this[name as (keyof Parameters)];
-      if (!(prop instanceof WithDefault)) {
+      if (!(prop instanceof Container)) {
         continue;
       }
       const v = p.get(name);
       if (v === null) {
         continue
       }
-      prop.set(v);
+      prop.setFromString(v);
     }
   }
 }
@@ -346,8 +375,8 @@ export class MarzipanUi extends LitElement {
       return;
     }
     const prop = this.params[elt.name as (keyof Parameters)];
-    if (prop instanceof WithDefault) {
-      prop.set(elt.value);
+    if (prop instanceof Container) {
+      prop.setFromString(elt.value);
       this.updateURL();
     }
   }
