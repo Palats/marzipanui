@@ -197,6 +197,13 @@ export class MarzipanUi extends LitElement {
     this.addEventListener('mui-value-change', () => {
       this.updateURL();
     })
+    window.addEventListener('popstate', () => this.handleLocationChange());
+
+    // Do an initial setup to get query parameters.
+    this.handleLocationChange();
+  }
+
+  handleLocationChange() {
     this.params.from(new URLSearchParams(document.location.search));
     this.updateURL();
   }
