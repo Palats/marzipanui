@@ -137,7 +137,7 @@ export class MarzipanUi extends LitElement {
   static styles = css`
     .imgscale {
       width: 100%;
-      height: 100%;
+      height: auto;
     }
   `
 
@@ -160,6 +160,7 @@ export class MarzipanUi extends LitElement {
               placeholder="${this.params.left.default()}"
               value="${ifDefined(this.params.left.maybe())}"
               @change="${this.handleChange}"
+              type="number"
               endaligned>
             </mwc-textfield>
             <mwc-textfield
@@ -167,6 +168,7 @@ export class MarzipanUi extends LitElement {
               placeholder="${this.params.right.default()}"
               value="${ifDefined(this.params.right.maybe())}"
               @change="${this.handleChange}"
+              type="number"
               endaligned>
             </mwc-textfield>
             <mwc-textfield
@@ -174,6 +176,7 @@ export class MarzipanUi extends LitElement {
               placeholder="${this.params.top.default()}"
               value="${ifDefined(this.params.top.maybe())}"
               @change="${this.handleChange}"
+              type="number"
               endaligned>
             </mwc-textfield>
             <mwc-textfield
@@ -181,6 +184,7 @@ export class MarzipanUi extends LitElement {
               placeholder="${this.params.bottom.default()}"
               value="${ifDefined(this.params.bottom.maybe())}"
               @change="${this.handleChange}"
+              type="number"
               endaligned>
             </mwc-textfield>
           </div>
@@ -195,7 +199,10 @@ export class MarzipanUi extends LitElement {
               placeholder="${this.params.maxiter.default()}"
               value="${ifDefined(this.params.maxiter.maybe())}"
               @change="${this.handleChange}"
-              helper="Maximum number of iteration per pixel"
+              helper="Max iterations per pixel"
+              autoValidate
+              .validityTransform="${this.validityPositiveInt}"
+              validationMessage="Must be a positive integer"
               endaligned>
             </mwc-textfield>
             <mwc-textfield
@@ -203,7 +210,10 @@ export class MarzipanUi extends LitElement {
               placeholder="${this.params.width.default()}"
               value="${ifDefined(this.params.width.maybe())}"
               @change="${this.handleChange}"
-              helper="Number of horizontal pixels to render"
+              helper="Horizontal pixels to render"
+              autoValidate
+              .validityTransform="${this.validityPositiveInt}"
+              validationMessage="Must be a positive integer"
               endaligned>
             </mwc-textfield>
             <mwc-textfield
@@ -211,7 +221,10 @@ export class MarzipanUi extends LitElement {
               placeholder="${this.params.height.default()}"
               value="${ifDefined(this.params.height.maybe())}"
               @change="${this.handleChange}"
-              helper="Number of vertical pixels to render"
+              helper="Vertical pixels to render"
+              autoValidate
+              .validityTransform="${this.validityPositiveInt}"
+              validationMessage="Must be a positive integer"
               endaligned>
             </mwc-textfield>
           </div>
@@ -225,6 +238,7 @@ export class MarzipanUi extends LitElement {
             </mwc-textfield>
           </div>
         </div>
+
         <div slot="appContent">
           <mwc-top-app-bar id="appbar">
             <mwc-icon-button slot="navigationIcon" icon="menu"></mwc-icon-button>
@@ -251,11 +265,14 @@ export class MarzipanUi extends LitElement {
   // Called by the various input elements when their value changes.
   handleChange(event: Event) {
     if (!event.target) { return }
-    const name = (event.target as HTMLInputElement).name;
-    const value = (event.target as HTMLInputElement).value;
-    const prop = this.params[name as (keyof Parameters)];
+    const elt = event.target as HTMLInputElement;
+    if (!elt.validity.valid) {
+      console.log("invalid value");
+      return;
+    }
+    const prop = this.params[elt.name as (keyof Parameters)];
     if (prop instanceof WithDefault) {
-      prop.set(value);
+      prop.set(elt.value);
       this.updateURL();
     }
   }
@@ -269,5 +286,11 @@ export class MarzipanUi extends LitElement {
     this.targetURL = this.params.url();
     history.pushState(null, "", '?' + this.params.query());
   }
-}
 
+  validityPositiveInt(newValue: string): Partial<ValidityState> {
+    const v = parseInt(newValue, 10);
+    return {
+      valid: newValue == "" || (!isNaN(v) && v > 0),
+    }
+  }
+}
