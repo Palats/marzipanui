@@ -1,11 +1,14 @@
 import { LitElement, html, css, property, customElement } from 'lit-element';
 import { ifDefined } from 'lit-html/directives/if-defined';
+import { classMap } from 'lit-html/directives/class-map.js';
 
 import '@material/mwc-top-app-bar';
 import '@material/mwc-drawer';
 import '@material/mwc-icon-button';
 import '@material/mwc-textfield';
 import '@material/mwc-icon';
+import '@material/mwc-switch';
+import '@material/mwc-formfield';
 import { Drawer } from '@material/mwc-drawer';
 
 
@@ -124,9 +127,19 @@ export class MarzipanUi extends LitElement {
   @property({ type: String })
   private targetURL = '';
 
+  // Autoscale the rendered fractal to viewport.
+  @property({ type: Boolean })
+  private autoscale = true;
+
   private params = new Parameters();
 
-  static styles = css``
+
+  static styles = css`
+    .imgscale {
+      width: 100%;
+      height: 100%;
+    }
+  `
 
   constructor() {
     super();
@@ -135,6 +148,7 @@ export class MarzipanUi extends LitElement {
   }
 
   render() {
+    const imgclasses = { imgscale: this.autoscale };
     return html`
     <main>
       <mwc-drawer type="dismissible" id="drawer">
@@ -170,13 +184,26 @@ export class MarzipanUi extends LitElement {
               endaligned>
             </mwc-textfield>
           </div>
-          <h4>Image size</h4>
+          <h4>Rendering</h4>
           <div>
-          <mwc-textfield
+            <mwc-formfield label="Scale image to viewport">
+              <mwc-switch ?checked="${this.autoscale}" @change="${this.handleAutoscale}"></mwc-switch>
+            </mwc-formfield>
+            <p></p>
+            <mwc-textfield
+              label="Max iterations" name="maxiter"
+              placeholder="${this.params.maxiter.default()}"
+              value="${ifDefined(this.params.maxiter.maybe())}"
+              @change="${this.handleChange}"
+              helper="Maximum number of iteration per pixel"
+              endaligned>
+            </mwc-textfield>
+            <mwc-textfield
               label="Width" name="width"
               placeholder="${this.params.width.default()}"
               value="${ifDefined(this.params.width.maybe())}"
               @change="${this.handleChange}"
+              helper="Number of horizontal pixels to render"
               endaligned>
             </mwc-textfield>
             <mwc-textfield
@@ -184,16 +211,7 @@ export class MarzipanUi extends LitElement {
               placeholder="${this.params.height.default()}"
               value="${ifDefined(this.params.height.maybe())}"
               @change="${this.handleChange}"
-              endaligned>
-            </mwc-textfield>
-          </div>
-          <h4>Rendering</h4>
-          <div>
-            <mwc-textfield
-              label="Max iterations" name="maxiter"
-              placeholder="${this.params.maxiter.default()}"
-              value="${ifDefined(this.params.maxiter.maybe())}"
-              @change="${this.handleChange}"
+              helper="Number of vertical pixels to render"
               endaligned>
             </mwc-textfield>
           </div>
@@ -213,7 +231,7 @@ export class MarzipanUi extends LitElement {
             <div slot="title">Marzipan</div>
           </mwc-top-app-bar>
           <div>
-            <img src="${this.targetURL}" alt="generated fractal" id="render"/>
+            <img src="${this.targetURL}" class=${classMap(imgclasses)} alt="generated fractal" id="render"/>
           </div>
         </div>
       </mwc-drawer>
@@ -240,6 +258,10 @@ export class MarzipanUi extends LitElement {
       prop.set(value);
       this.updateURL();
     }
+  }
+
+  handleAutoscale(event: Event) {
+    this.autoscale = !this.autoscale;
   }
 
   // Start refresh the image.
