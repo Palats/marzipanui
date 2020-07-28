@@ -264,7 +264,14 @@ export class MarzipanUi extends LitElement {
   @query('#progress')
   private progress: LinearProgress | undefined;
 
+  @query('#mainimg')
+  private img: Element | undefined;
+
   private params: Parameters = new Parameters(this);
+
+  private imgscroll = false;
+  private imgscroll_origin_x = 0;
+  private imgscroll_origin_y = 0;
 
   static styles = css`
     .imgscale {
@@ -325,11 +332,17 @@ export class MarzipanUi extends LitElement {
           </mwc-top-app-bar>
           <div>
             <img
+              id="mainimg"
               src="${this.targetURL}"
               class=${classMap(imgclasses)}
               alt="generated fractal"
               @load="${this.handleImgLoad}"
               @error="${this.handleImgError}"
+              @wheel="${this.handleWheel}"
+              @mousedown="${this.handleMouseDown}"
+              @mouseup="${this.handleMouseUp}"
+              @mousemove="${this.handleMouseMove}"
+              @mouseout="${this.handleMouseOut}"
             />
           </div>
         </div>
@@ -384,5 +397,85 @@ export class MarzipanUi extends LitElement {
 
   handleAutoscale(event: Event) {
     this.autoscale = !this.autoscale;
+  }
+
+  handleWheel(event: WheelEvent) {
+    if (!this.img) {
+      return;
+    }
+    event.preventDefault();
+    console.log("wheel", event.deltaY);
+    // negative up, positive down
+    const scale = 1.0 + 0.01 * event.deltaY;
+    const sx = this.params.right.get() - this.params.left.get();
+    const sy = this.params.top.get() - this.params.bottom.get();
+
+    const rect = this.img.getBoundingClientRect();
+    const rx = (event.clientX - rect.left) / rect.width;
+    const ry = (event.clientY - rect.top) / rect.height;
+
+    const x = this.params.left.get() + sx * rx;
+    const y = this.params.bottom.get() + sy * ry;
+
+    this.params.left.set(x - rx * sx * scale);
+    this.params.right.set(x + (1.0 - rx) * sx * scale);
+    this.params.bottom.set(y - ry * sy * scale);
+    this.params.top.set(y + (1.0 - ry) * sy * scale);
+  }
+
+  handleMouseDown(event: MouseEvent) {
+    if ((event.buttons & 1) == 0) {
+      return
+    }
+    if (!this.img) {
+      return;
+    }
+
+    event.preventDefault();
+
+    this.imgscroll = true;
+    this.imgscroll_origin_x = event.clientX;
+    this.imgscroll_origin_y = event.clientY;
+  }
+
+  handleMouseUp(event: MouseEvent) {
+    // If main button is still clicked, we're not interested in that event.
+    if ((event.buttons & 1) == 1) {
+      return
+    }
+    if (!this.imgscroll) {
+      return
+    }
+
+    // Clear scrolling info - this way, even if for some reason img is not
+    // accessible anymore, we avoid having inconsistent state.
+    this.imgscroll = false
+    event.preventDefault();
+    if (!this.img) {
+      return;
+    }
+
+    const clientdx = event.clientX - this.imgscroll_origin_x;
+    const clientdy = event.clientY - this.imgscroll_origin_y;
+
+    const rect = this.img.getBoundingClientRect();
+    const sx = this.params.right.get() - this.params.left.get();
+    const sy = this.params.top.get() - this.params.bottom.get();
+
+    // X dimension is in the same direction in the fractale and the client, but
+    // Y dimensions are inversed.
+    const dx = -clientdx * sx / rect.width;
+    const dy = clientdy * sy / rect.height;
+
+    this.params.left.set(this.params.left.get() + dx);
+    this.params.right.set(this.params.right.get() + dx);
+    this.params.top.set(this.params.top.get() + dy);
+    this.params.bottom.set(this.params.bottom.get() + dy);
+  }
+
+  handleMouseMove(event: MouseEvent) { }
+
+  handleMouseOut(event: MouseEvent) {
+    this.imgscroll = false;
   }
 }
