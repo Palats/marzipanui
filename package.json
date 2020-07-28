@@ -14,6 +14,8 @@
     "@material/mwc-icon": "^0.17.2",
     "@material/mwc-icon-button": "^0.17.2",
     "@material/mwc-linear-progress": "^0.17.2",
+    "@material/mwc-list": "^0.17.2",
+    "@material/mwc-select": "^0.17.2",
     "@material/mwc-snackbar": "^0.17.2",
     "@material/mwc-switch": "^0.17.2",
     "@material/mwc-textfield": "^0.17.2",

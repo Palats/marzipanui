@@ -11,6 +11,8 @@ import '@material/mwc-switch';
 import '@material/mwc-formfield';
 import '@material/mwc-snackbar';
 import '@material/mwc-linear-progress';
+import '@material/mwc-select';
+import '@material/mwc-list/mwc-list-item';
 
 import { Snackbar } from '@material/mwc-snackbar';
 import { Drawer } from '@material/mwc-drawer';
@@ -103,6 +105,16 @@ class PositiveIntContainer extends Container<number> {
   newElement() { return new EditNumber(this); }
 }
 
+class EnumContainer extends Container<string> {
+  values: string[] = [];
+
+  fromString(v: string): string { return v; }
+  toString(v: string): string { return v; }
+  validate(s: string): boolean { return true; }
+
+  newElement() { return new EditEnum(this); }
+}
+
 @customElement('mui-edit-number')
 class EditNumber<T> extends LitElement {
   constructor(public data: Container<T>) { super(); }
@@ -171,6 +183,35 @@ class EditString<T> extends LitElement {
   }
 }
 
+@customElement('mui-edit-enum')
+class EditEnum extends LitElement {
+  constructor(public data: EnumContainer) { super(); }
+
+  @query('#field')
+  field: TextField | undefined;
+
+  render() {
+    return html`
+      <mwc-select
+        id='field'
+        label="${this.data.caption}"
+        @change="${this.handleChange}">
+        ${this.data.values.map((v) => html`<mwc-list-item value="${v}" ?selected=${v == this.data.get()}>${v}</mwc-list-item>`)}
+      </mwc-select>
+    `;
+  }
+
+  handleChange(event: Event) {
+    if (!this.field || !this.field.validity.valid) {
+      console.log("invalid value");
+      return;
+    }
+    this.data.setFromString(this.field.value);
+    this.dispatchEvent(new CustomEvent("mui-value-change", { bubbles: true }));
+  }
+}
+
+
 
 // Hold all parameters that Marzipan can accept.
 class Parameters {
@@ -182,8 +223,11 @@ class Parameters {
   public width = new PositiveIntContainer("Width", 900, this.event);
   public height = new PositiveIntContainer("Height", 600, this.event);
   public maxiter = new PositiveIntContainer("Max iterations", 100, this.event);
+  public type = new EnumContainer("Fractal type", "mandelbrot", this.event);
 
-  constructor(private event?: EventTarget) { }
+  constructor(private event?: EventTarget) {
+    this.type.values = ["mandelbrot", "julia"];
+  }
 
   // Returns all parameters with their values. If the value has not been
   // explictly set, the default value will be used.
@@ -311,6 +355,10 @@ export class MarzipanUi extends LitElement {
     <main>
       <mwc-drawer type="dismissible" id="drawer">
         <div>
+          <h4>Fractal</h4>
+          <div>
+          ${this.params.type.newElement()}
+          </div>
           <h4>Position</h4>
           <div>
             ${this.params.left.newElement()}
