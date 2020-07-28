@@ -258,20 +258,29 @@ export class MarzipanUi extends LitElement {
   @property({ type: Boolean })
   private autoscale = true;
 
+  // The element used to display image loading errors.
   @query('#imgError')
   private imgError: Snackbar | undefined;
 
+  // The element to display loading in progress.
   @query('#progress')
   private progress: LinearProgress | undefined;
 
+  // The img elemnt displaying the fractal.
   @query('#mainimg')
   private img: Element | undefined;
 
+  // Rendering parameters of the fractal.
   private params: Parameters = new Parameters(this);
 
+  // Parameters for drag'n'drop style scrolling.
   private imgscroll = false;
-  private imgscroll_origin_x = 0;
-  private imgscroll_origin_y = 0;
+  private imgscrollOriginX = 0;
+  private imgscrollOriginY = 0;
+
+  // If a request to reload the fractal is inflight, this will store the
+  // timoeutID.
+  private reloadTimer: ReturnType<typeof setTimeout> | undefined;
 
   static styles = css`
     .imgscale {
@@ -282,7 +291,7 @@ export class MarzipanUi extends LitElement {
   constructor() {
     super();
     this.addEventListener('mui-value-change', () => {
-      this.updateURL();
+      this.queueImageChange();
     })
     window.addEventListener('popstate', () => this.handleLocationChange());
 
@@ -292,7 +301,7 @@ export class MarzipanUi extends LitElement {
 
   handleLocationChange() {
     this.params.from(new URLSearchParams(document.location.search));
-    this.updateURL();
+    this.queueImageChange();
   }
 
   render() {
@@ -349,7 +358,7 @@ export class MarzipanUi extends LitElement {
       </mwc-drawer>
     </main>
     <mwc-linear-progress id="progress" indeterminate></mwc-linear-progress>
-    <mwc-snackbar id="imgError" labelText="Unable to load fractale image.">
+    <mwc-snackbar id="imgError" labelText="Unable to load fractal image.">
         <mwc-icon-button icon="close" slot="dismiss"></mwc-icon-button>
     </mwc-snackbar>
     `;
@@ -364,12 +373,22 @@ export class MarzipanUi extends LitElement {
     });
   }
 
-  // Start refresh the image.
-  updateURL() {
+  // Start refresh the image. That delays the refresh a bit. When multiple
+  // events happen in quick succession, that will collapse them into only a
+  // single update, once things calm down.
+  queueImageChange() {
+    if (this.reloadTimer !== undefined) {
+      clearTimeout(this.reloadTimer);
+    }
+    this.reloadTimer = setTimeout(() => this.doImageChange(), 100);
+  }
+
+  doImageChange() {
     const newURL = this.params.url();
     if (newURL == this.targetURL) {
       return;
     }
+    console.log("update image:", newURL);
     this.targetURL = this.params.url();
     history.pushState(null, "", '?' + this.params.query());
 
@@ -438,8 +457,8 @@ export class MarzipanUi extends LitElement {
     event.preventDefault();
 
     this.imgscroll = true;
-    this.imgscroll_origin_x = event.clientX;
-    this.imgscroll_origin_y = event.clientY;
+    this.imgscrollOriginX = event.clientX;
+    this.imgscrollOriginY = event.clientY;
   }
 
   handleMouseUp(event: MouseEvent) {
@@ -459,8 +478,8 @@ export class MarzipanUi extends LitElement {
       return;
     }
 
-    const clientdx = event.clientX - this.imgscroll_origin_x;
-    const clientdy = event.clientY - this.imgscroll_origin_y;
+    const clientdx = event.clientX - this.imgscrollOriginX;
+    const clientdy = event.clientY - this.imgscrollOriginY;
 
     const rect = this.img.getBoundingClientRect();
     const sx = this.params.right.get() - this.params.left.get();
