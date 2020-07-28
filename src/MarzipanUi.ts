@@ -366,6 +366,10 @@ export class MarzipanUi extends LitElement {
 
   // Start refresh the image.
   updateURL() {
+    const newURL = this.params.url();
+    if (newURL == this.targetURL) {
+      return;
+    }
     this.targetURL = this.params.url();
     history.pushState(null, "", '?' + this.params.query());
 
