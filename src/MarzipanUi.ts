@@ -478,16 +478,27 @@ export class MarzipanUi extends LitElement {
     console.log("wheel", event.deltaY);
     // negative up, positive down
     const scale = 1.0 + 0.01 * event.deltaY;
+    //const scale = 0.9;
+
+    // Size of the window in fractal space.
     const sx = this.params.right.get() - this.params.left.get();
     const sy = this.params.top.get() - this.params.bottom.get();
 
+    // Window in screen spapce.
     const rect = this.img.getBoundingClientRect();
-    const rx = (event.clientX - rect.left) / rect.width;
-    const ry = (event.clientY - rect.top) / rect.height;
 
+    // Position of the mouse as a proportion, using top left screen space as
+    // reference. Fractal space is upside down compared to window space, so the
+    // proportion must be inversed.
+    const rx = (event.clientX - rect.x) / rect.width;
+    const ry = 1.0 - ((event.clientY - rect.y) / rect.height);
+
+    // Position of the click in fractal space.
     const x = this.params.left.get() + sx * rx;
     const y = this.params.bottom.get() + sy * ry;
 
+    // Update the fractal space window to keep the mouse cursor in the same
+    // place.
     this.params.left.set(x - rx * sx * scale);
     this.params.right.set(x + (1.0 - rx) * sx * scale);
     this.params.bottom.set(y - ry * sy * scale);
