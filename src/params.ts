@@ -205,8 +205,8 @@ export class Parameters {
     public address = new StringContainer("Address", "http://localhost:8080", this.event);
     public left = new FloatContainer("Left", -2.0, this.event);
     public right = new FloatContainer("Right", 1.0, this.event);
-    public top = new FloatContainer("Top", 1.0, this.event);
-    public bottom = new FloatContainer("Bottom", -1.0, this.event);
+    public top = new FloatContainer("Top", -1.0, this.event);
+    public bottom = new FloatContainer("Bottom", 1.0, this.event);
     public width = new PositiveIntContainer("Width", 900, this.event);
     public height = new PositiveIntContainer("Height", 600, this.event);
     public maxiter = new PositiveIntContainer("Max iterations", 100, this.event);

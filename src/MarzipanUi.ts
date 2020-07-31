@@ -224,27 +224,26 @@ export class MarzipanUi extends LitElement {
 
     // Size of the window in fractal space.
     const sx = this.params.right.get() - this.params.left.get();
-    const sy = this.params.top.get() - this.params.bottom.get();
+    const sy = this.params.bottom.get() - this.params.top.get();
 
     // Window in screen spapce.
     const rect = this.canvas.getBoundingClientRect();
 
     // Position of the mouse as a proportion, using top left screen space as
-    // reference. Fractal space is upside down compared to window space, so the
-    // proportion must be inversed.
+    // reference.
     const rx = (clientX - rect.x) / rect.width;
-    const ry = 1.0 - ((clientY - rect.y) / rect.height);
+    const ry = (clientY - rect.y) / rect.height;
 
     // Position of the click in fractal space.
     const x = this.params.left.get() + sx * rx;
-    const y = this.params.bottom.get() + sy * ry;
+    const y = this.params.top.get() + sy * ry;
 
     // Update the fractal space window to keep the mouse cursor in the same
     // place.
     this.params.left.set(x - rx * sx / scale);
     this.params.right.set(x + (1.0 - rx) * sx / scale);
-    this.params.bottom.set(y - ry * sy / scale);
-    this.params.top.set(y + (1.0 - ry) * sy / scale);
+    this.params.top.set(y - ry * sy / scale);
+    this.params.bottom.set(y + (1.0 - ry) * sy / scale);
   }
 
   handleMouseDown(event: MouseEvent) {
@@ -287,12 +286,10 @@ export class MarzipanUi extends LitElement {
 
     const rect = this.canvas.getBoundingClientRect();
     const sx = this.params.right.get() - this.params.left.get();
-    const sy = this.params.top.get() - this.params.bottom.get();
+    const sy = this.params.bottom.get() - this.params.top.get();
 
-    // X dimension is in the same direction in the fractale and the client, but
-    // Y dimensions are inversed.
     const dx = -clientdx * sx / rect.width;
-    const dy = clientdy * sy / rect.height;
+    const dy = -clientdy * sy / rect.height;
 
     this.params.left.set(this.params.left.get() + dx);
     this.params.right.set(this.params.right.get() + dx);
