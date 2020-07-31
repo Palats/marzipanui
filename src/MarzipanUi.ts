@@ -19,10 +19,6 @@ import * as params from './params';
 @customElement('marzipan-ui')
 export class MarzipanUi extends LitElement {
 
-  // Current URL for loading the fractal image.
-  @property({ type: String })
-  private targetURL = '';
-
   // The element used to display image loading errors.
   @query('#imgError')
   private imgError: Snackbar | undefined;
@@ -38,7 +34,6 @@ export class MarzipanUi extends LitElement {
   // Rendering parameters of the fractal.
   private params: params.Parameters = new params.Parameters(this);
 
-  private loadingImg: HTMLImageElement | undefined;
   private currentImg: HTMLImageElement | undefined;
 
   // Parameters for drag'n'drop style scrolling.
@@ -149,27 +144,25 @@ export class MarzipanUi extends LitElement {
 
   doImageChange() {
     const newURL = this.params.url();
-    if (newURL == this.targetURL) {
+    if (this.currentImg && this.currentImg.src == newURL) {
       return;
     }
     console.log("update image:", newURL);
-    this.targetURL = newURL;
     history.pushState(null, "", '?' + this.params.query());
 
-    this.loadingImg = document.createElement("img");
-    this.loadingImg.src = newURL;
-    this.loadingImg.onload = evt => {
-      this.currentImg = this.loadingImg;
-      this.loadingImg = undefined;
+    const loadingImg = document.createElement("img");
+    loadingImg.src = newURL;
+    loadingImg.addEventListener("load", evt => {
+      this.currentImg = loadingImg;
       this.redraw();
       this.imgError?.close();
       this.progress?.close();
-    }
-    this.loadingImg.onerror = evt => {
-      this.loadingImg = undefined;
+    });
+    loadingImg.addEventListener("error", evt => {
+      console.log("error");
       this.imgError?.show();
       this.progress?.close();
-    }
+    });
 
     this.imgError?.close();
     this.progress?.open();
@@ -285,6 +278,12 @@ export class MarzipanUi extends LitElement {
 
     const clientdx = event.clientX - this.imgscrollOriginX;
     const clientdy = event.clientY - this.imgscrollOriginY;
+
+    // If there was no movement, that might have been a click, a doubleclick or
+    // something not relevant.
+    if (clientdx == 0 && clientdy == 0) {
+      return;
+    }
 
     const rect = this.canvas.getBoundingClientRect();
     const sx = this.params.right.get() - this.params.left.get();
