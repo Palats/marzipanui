@@ -139,6 +139,10 @@ export class MarzipanUi extends LitElement {
     this.shadowRoot?.addEventListener('MDCTopAppBar:nav', () => {
       drawer.open = !drawer.open;
     });
+    (new ResizeObserver(entries => {
+      console.log("resize", entries);
+      this.redraw();
+    })).observe(this.canvas!);
   }
 
   // Start refresh the image. That delays the refresh a bit. When multiple
