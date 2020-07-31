@@ -31,16 +31,15 @@ export class MarzipanUi extends LitElement {
   @query('#progress')
   private progress: LinearProgress | undefined;
 
-  // The img element loading the fractal.
-  @query('#mainimg')
-  private img: HTMLImageElement | undefined;
-
   // The canvas where to render the fractal.
   @query('#canvas')
   private canvas: HTMLCanvasElement | undefined;
 
   // Rendering parameters of the fractal.
   private params: params.Parameters = new params.Parameters(this);
+
+  private loadingImg: HTMLImageElement | undefined;
+  private currentImg: HTMLImageElement | undefined;
 
   // Parameters for drag'n'drop style scrolling.
   private imgscroll = false;
@@ -117,13 +116,6 @@ export class MarzipanUi extends LitElement {
             @mouseout="${this.handleMouseOut}"
           >
           </canvas>
-          <img
-            style="display: none;"
-            id="mainimg"
-            src="${this.targetURL}"
-            @load="${this.handleImgLoad}"
-            @error="${this.handleImgError}"
-          />
           <mwc-linear-progress id="progress" indeterminate></mwc-linear-progress>
           <mwc-snackbar id="imgError" labelText="Unable to load fractal image.">
             <mwc-icon-button icon="close" slot="dismiss"></mwc-icon-button>
@@ -141,7 +133,6 @@ export class MarzipanUi extends LitElement {
       drawer.open = !drawer.open;
     });
     (new ResizeObserver(entries => {
-      console.log("resize", entries);
       this.redraw();
     })).observe(this.canvas!);
   }
@@ -165,6 +156,21 @@ export class MarzipanUi extends LitElement {
     this.targetURL = newURL;
     history.pushState(null, "", '?' + this.params.query());
 
+    this.loadingImg = document.createElement("img");
+    this.loadingImg.src = newURL;
+    this.loadingImg.onload = evt => {
+      this.currentImg = this.loadingImg;
+      this.loadingImg = undefined;
+      this.redraw();
+      this.imgError?.close();
+      this.progress?.close();
+    }
+    this.loadingImg.onerror = evt => {
+      this.loadingImg = undefined;
+      this.imgError?.show();
+      this.progress?.close();
+    }
+
     this.imgError?.close();
     this.progress?.open();
   }
@@ -172,7 +178,7 @@ export class MarzipanUi extends LitElement {
   redraw() {
     const canvas = this.canvas;
     const ctx = this.canvas?.getContext('2d');
-    const img = this.img;
+    const img = this.currentImg;
     if (!canvas || !ctx || !img) {
       console.log('missing elements');
       return
@@ -203,17 +209,6 @@ export class MarzipanUi extends LitElement {
     ctx.scale(scale, scale);
     ctx.drawImage(img, 0, 0);
     ctx.restore();
-  }
-
-  handleImgLoad(event: Event) {
-    this.redraw();
-    this.imgError?.close();
-    this.progress?.close();
-  }
-
-  handleImgError(event: Event) {
-    this.imgError?.show();
-    this.progress?.close();
   }
 
   handleWheel(event: WheelEvent) {
