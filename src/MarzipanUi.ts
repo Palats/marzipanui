@@ -46,9 +46,14 @@ export class MarzipanUi extends LitElement {
   private reloadTimer: ReturnType<typeof setTimeout> | undefined;
 
   static styles = css`
-    .imgscale {
-      width: 100%;
-      height: auto;
+    .checkered {
+      background-image:
+      linear-gradient(45deg, #ccc 25%, transparent 25%),
+      linear-gradient(135deg, #ccc 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #ccc 75%),
+      linear-gradient(135deg, transparent 75%, #ccc 75%);
+      background-size: 16px 16px;
+      background-position:0 0, 8px 0, 8px -8px, 0px 8px;
     }
   `
   constructor() {
@@ -94,7 +99,7 @@ export class MarzipanUi extends LitElement {
           </div>
         </div>
 
-        <div slot="appContent" style="height:100%; display: flex; flex-flow: column nowrap">
+        <div slot="appContent" style="height:100%; display: flex; flex-flow: column nowrap;" class="checkered">
           <mwc-top-app-bar id="appbar">
             <mwc-icon-button slot="navigationIcon" icon="menu"></mwc-icon-button>
             <div slot="title">Marzipan</div>
