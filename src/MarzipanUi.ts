@@ -110,6 +110,7 @@ export class MarzipanUi extends LitElement {
             style="width: 100%; flex-grow: 1;"
             alt="generated fractal"
             @wheel="${this.handleWheel}"
+            @dblclick="${this.handleDblclick}"
             @mousedown="${this.handleMouseDown}"
             @mouseup="${this.handleMouseUp}"
             @mousemove="${this.handleMouseMove}"
@@ -216,14 +217,22 @@ export class MarzipanUi extends LitElement {
   }
 
   handleWheel(event: WheelEvent) {
-    if (!this.canvas) {
-      return;
-    }
     event.preventDefault();
     console.log("wheel", event.deltaY);
     // negative up, positive down
-    const scale = 1.0 + 0.01 * event.deltaY;
-    //const scale = 0.9;
+    const scale = 1.0 - 0.01 * event.deltaY;
+    this.zoom(event.clientX, event.clientY, scale);
+  }
+
+  handleDblclick(event: WheelEvent) {
+    event.preventDefault();
+    this.zoom(event.clientX, event.clientY, 1.5);
+  }
+
+  zoom(clientX: number, clientY: number, scale: number) {
+    if (!this.canvas) {
+      return;
+    }
 
     // Size of the window in fractal space.
     const sx = this.params.right.get() - this.params.left.get();
@@ -235,8 +244,8 @@ export class MarzipanUi extends LitElement {
     // Position of the mouse as a proportion, using top left screen space as
     // reference. Fractal space is upside down compared to window space, so the
     // proportion must be inversed.
-    const rx = (event.clientX - rect.x) / rect.width;
-    const ry = 1.0 - ((event.clientY - rect.y) / rect.height);
+    const rx = (clientX - rect.x) / rect.width;
+    const ry = 1.0 - ((clientY - rect.y) / rect.height);
 
     // Position of the click in fractal space.
     const x = this.params.left.get() + sx * rx;
@@ -244,10 +253,10 @@ export class MarzipanUi extends LitElement {
 
     // Update the fractal space window to keep the mouse cursor in the same
     // place.
-    this.params.left.set(x - rx * sx * scale);
-    this.params.right.set(x + (1.0 - rx) * sx * scale);
-    this.params.bottom.set(y - ry * sy * scale);
-    this.params.top.set(y + (1.0 - ry) * sy * scale);
+    this.params.left.set(x - rx * sx / scale);
+    this.params.right.set(x + (1.0 - rx) * sx / scale);
+    this.params.bottom.set(y - ry * sy / scale);
+    this.params.top.set(y + (1.0 - ry) * sy / scale);
   }
 
   handleMouseDown(event: MouseEvent) {
