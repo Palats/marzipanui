@@ -23,10 +23,6 @@ export class MarzipanUi extends LitElement {
   @property({ type: String })
   private targetURL = '';
 
-  // Autoscale the rendered fractal to viewport.
-  @property({ type: Boolean })
-  private autoscale = true;
-
   // The element used to display image loading errors.
   @query('#imgError')
   private imgError: Snackbar | undefined;
@@ -35,9 +31,13 @@ export class MarzipanUi extends LitElement {
   @query('#progress')
   private progress: LinearProgress | undefined;
 
-  // The img elemnt displaying the fractal.
+  // The img element loading the fractal.
   @query('#mainimg')
-  private img: Element | undefined;
+  private img: HTMLImageElement | undefined;
+
+  // The canvas where to render the fractal.
+  @query('#canvas')
+  private canvas: HTMLCanvasElement | undefined;
 
   // Rendering parameters of the fractal.
   private params: params.Parameters = new params.Parameters(this);
@@ -74,10 +74,7 @@ export class MarzipanUi extends LitElement {
   }
 
   render() {
-    const imgclasses = { imgscale: this.autoscale };
-
     return html`
-    <main>
       <mwc-drawer type="dismissible" id="drawer">
         <div>
           <h4>Fractal</h4>
@@ -93,10 +90,6 @@ export class MarzipanUi extends LitElement {
           </div>
           <h4>Rendering</h4>
           <div>
-            <mwc-formfield label="Scale image to viewport">
-              <mwc-switch ?checked="${this.autoscale}" @change="${this.handleAutoscale}"></mwc-switch>
-            </mwc-formfield>
-            <p></p>
             ${this.params.maxiter.newElement()}
             ${this.params.width.newElement()}
             ${this.params.height.newElement()}
@@ -107,33 +100,35 @@ export class MarzipanUi extends LitElement {
           </div>
         </div>
 
-        <div slot="appContent">
+        <div slot="appContent" style="height:100%; display: flex; flex-flow: column nowrap">
           <mwc-top-app-bar id="appbar">
             <mwc-icon-button slot="navigationIcon" icon="menu"></mwc-icon-button>
             <div slot="title">Marzipan</div>
           </mwc-top-app-bar>
-          <div>
-            <img
-              id="mainimg"
-              src="${this.targetURL}"
-              class=${classMap(imgclasses)}
-              alt="generated fractal"
-              @load="${this.handleImgLoad}"
-              @error="${this.handleImgError}"
-              @wheel="${this.handleWheel}"
-              @mousedown="${this.handleMouseDown}"
-              @mouseup="${this.handleMouseUp}"
-              @mousemove="${this.handleMouseMove}"
-              @mouseout="${this.handleMouseOut}"
-            />
-          </div>
+          <canvas
+            id="canvas"
+            style="width: 100%; flex-grow: 1;"
+            alt="generated fractal"
+            @wheel="${this.handleWheel}"
+            @mousedown="${this.handleMouseDown}"
+            @mouseup="${this.handleMouseUp}"
+            @mousemove="${this.handleMouseMove}"
+            @mouseout="${this.handleMouseOut}"
+          >
+          </canvas>
+          <img
+            style="display: none;"
+            id="mainimg"
+            src="${this.targetURL}"
+            @load="${this.handleImgLoad}"
+            @error="${this.handleImgError}"
+          />
+          <mwc-linear-progress id="progress" indeterminate></mwc-linear-progress>
+          <mwc-snackbar id="imgError" labelText="Unable to load fractal image.">
+            <mwc-icon-button icon="close" slot="dismiss"></mwc-icon-button>
+          </mwc-snackbar>
         </div>
       </mwc-drawer>
-    </main>
-    <mwc-linear-progress id="progress" indeterminate></mwc-linear-progress>
-    <mwc-snackbar id="imgError" labelText="Unable to load fractal image.">
-        <mwc-icon-button icon="close" slot="dismiss"></mwc-icon-button>
-    </mwc-snackbar>
     `;
   }
 
@@ -162,41 +157,57 @@ export class MarzipanUi extends LitElement {
       return;
     }
     console.log("update image:", newURL);
-    this.targetURL = this.params.url();
+    this.targetURL = newURL;
     history.pushState(null, "", '?' + this.params.query());
 
-    if (this.imgError) {
-      this.imgError.close();
+    this.imgError?.close();
+    this.progress?.open();
+  }
+
+  redraw() {
+    const canvas = this.canvas;
+    const ctx = this.canvas?.getContext('2d');
+    const img = this.img;
+    if (!canvas || !ctx || !img) {
+      console.log('missing elements');
+      return
     }
-    if (this.progress) {
-      this.progress.open();
+
+    // Have 1:1 matching between canvas pixels & screen.
+    // This allows drawing while keeping max resolution.
+    const width = canvas.clientWidth;
+    const height = canvas.clientHeight;
+    if (canvas.width !== width || canvas.height !== height) {
+      canvas.width = width;
+      canvas.height = height;
     }
+
+    // Maximize size of the image while keeping aspect ratio;
+    const xscale = width / img.width;
+    const yscale = height / img.height;
+    const scale = xscale < yscale ? xscale : yscale;
+
+    // Draw.
+    ctx.save();
+    ctx.clearRect(0, 0, width, height);
+    ctx.scale(scale, scale);
+    ctx.drawImage(img, 0, 0);
+    ctx.restore();
   }
 
   handleImgLoad(event: Event) {
-    if (this.imgError) {
-      this.imgError.close();
-    }
-    if (this.progress) {
-      this.progress.close();
-    }
+    this.redraw();
+    this.imgError?.close();
+    this.progress?.close();
   }
 
   handleImgError(event: Event) {
-    if (this.imgError) {
-      this.imgError.show();
-    }
-    if (this.progress) {
-      this.progress.close();
-    }
-  }
-
-  handleAutoscale(event: Event) {
-    this.autoscale = !this.autoscale;
+    this.imgError?.show();
+    this.progress?.close();
   }
 
   handleWheel(event: WheelEvent) {
-    if (!this.img) {
+    if (!this.canvas) {
       return;
     }
     event.preventDefault();
@@ -210,7 +221,7 @@ export class MarzipanUi extends LitElement {
     const sy = this.params.top.get() - this.params.bottom.get();
 
     // Window in screen spapce.
-    const rect = this.img.getBoundingClientRect();
+    const rect = this.canvas.getBoundingClientRect();
 
     // Position of the mouse as a proportion, using top left screen space as
     // reference. Fractal space is upside down compared to window space, so the
@@ -234,9 +245,6 @@ export class MarzipanUi extends LitElement {
     if ((event.buttons & 1) == 0) {
       return
     }
-    if (!this.img) {
-      return;
-    }
 
     event.preventDefault();
 
@@ -258,14 +266,14 @@ export class MarzipanUi extends LitElement {
     // accessible anymore, we avoid having inconsistent state.
     this.imgscroll = false
     event.preventDefault();
-    if (!this.img) {
+    if (!this.canvas) {
       return;
     }
 
     const clientdx = event.clientX - this.imgscrollOriginX;
     const clientdy = event.clientY - this.imgscrollOriginY;
 
-    const rect = this.img.getBoundingClientRect();
+    const rect = this.canvas.getBoundingClientRect();
     const sx = this.params.right.get() - this.params.left.get();
     const sy = this.params.top.get() - this.params.bottom.get();
 
