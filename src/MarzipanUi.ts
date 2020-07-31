@@ -191,9 +191,14 @@ export class MarzipanUi extends LitElement {
     const yscale = height / img.height;
     const scale = xscale < yscale ? xscale : yscale;
 
+    // Add an offset to center the image on the available space.
+    const dx = (width - img.width * scale) / 2.0;
+    const dy = (height - img.height * scale) / 2.0;
+
     // Draw.
     ctx.save();
     ctx.clearRect(0, 0, width, height);
+    ctx.translate(dx, dy);
     ctx.scale(scale, scale);
     ctx.drawImage(img, 0, 0);
     ctx.restore();
