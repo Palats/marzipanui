@@ -1,5 +1,4 @@
 import { LitElement, html, css, property, customElement, query } from 'lit-element';
-import { classMap } from 'lit-html/directives/class-map.js';
 
 import '@material/mwc-top-app-bar';
 import '@material/mwc-drawer';
@@ -34,6 +33,7 @@ export class MarzipanUi extends LitElement {
   // Rendering parameters of the fractal.
   private params: params.Parameters = new params.Parameters(this);
 
+  @property({ attribute: false })
   private currentImg: HTMLImageElement | undefined;
 
   // Parameters for drag'n'drop style scrolling.
@@ -120,6 +120,11 @@ export class MarzipanUi extends LitElement {
           <mwc-snackbar id="imgError" labelText="Unable to load fractal image.">
             <mwc-icon-button icon="close" slot="dismiss"></mwc-icon-button>
           </mwc-snackbar>
+          ${this.currentImg ? html`
+            <div style="position: absolute; bottom: 3px; right: 10px;">
+              <a href="${this.currentImg?.src}" target="_blank"><mwc-icon>open_in_new</mwc-icon></a>
+            </div>
+          ` : ``}
         </div>
       </mwc-drawer>
     `;
