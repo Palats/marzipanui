@@ -52,8 +52,8 @@ export class MarzipanUi extends LitElement {
       linear-gradient(135deg, #ccc 25%, transparent 25%),
       linear-gradient(45deg, transparent 75%, #ccc 75%),
       linear-gradient(135deg, transparent 75%, #ccc 75%);
-      background-size: 16px 16px;
-      background-position:0 0, 8px 0, 8px -8px, 0px 8px;
+      background-size: 20px 20px;
+      background-position:0 0, 10px 0, 10px -10px, 0px 10px;
     }
   `
   constructor() {
