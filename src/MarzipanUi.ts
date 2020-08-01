@@ -55,6 +55,10 @@ export class MarzipanUi extends LitElement {
 
   private canvasFromFractal: DOMMatrixReadOnly | undefined;
 
+  // Apply an extra transform of the obtained images - allow for scrolling &
+  // changes before a new complete image is loaded.
+  private extraTransform = new DOMMatrixReadOnly();
+
   static styles = css`
     .checkered {
       background-image:
@@ -180,6 +184,7 @@ export class MarzipanUi extends LitElement {
     loadingImg.addEventListener("load", evt => {
       this.currentImg = loadingImg;
       this.currentParams = newParams;
+      this.extraTransform = new DOMMatrixReadOnly();
       this.redraw();
       this.imgError?.close();
       this.progress?.close();
@@ -221,6 +226,8 @@ export class MarzipanUi extends LitElement {
     const dx = (width - img.width * scale) / 2.0;
     const dy = (height - img.height * scale) / 2.0;
 
+    const topleft = new DOMPointReadOnly(this.currentParams.left.get(), this.currentParams.top.get());
+
     const canvasFromFractalImg = (new DOMMatrixReadOnly()).scale(scale).translate(dx, dy);
     const fractalImgFromFractal = (new DOMMatrixReadOnly())
       .scale(
@@ -228,16 +235,19 @@ export class MarzipanUi extends LitElement {
         img.height / (this.currentParams.bottom.get() - this.currentParams.top.get()),
       )
       .translate(
-        -this.currentParams.left.get(),
-        -this.currentParams.top.get());
+        -topleft.x,
+        -topleft.y)
+      .multiply(this.extraTransform);
 
     this.canvasFromFractal = canvasFromFractalImg.multiply(fractalImgFromFractal);
+
+    const ref = fractalImgFromFractal.transformPoint(topleft);
 
     // Draw.
     ctx.save();
     ctx.clearRect(0, 0, width, height);
     ctx.setTransform(canvasFromFractalImg);
-    ctx.drawImage(img, 0, 0);
+    ctx.drawImage(img, ref.x, ref.y);
     ctx.restore();
   }
 
@@ -301,6 +311,7 @@ export class MarzipanUi extends LitElement {
     event.preventDefault();
 
     this.imgscrollOrigin = new DOMPointReadOnly(event.clientX, event.clientY);
+    this.extraTransform = new DOMMatrixReadOnly();
   }
 
   handleMouseUp(event: MouseEvent) {
@@ -341,9 +352,33 @@ export class MarzipanUi extends LitElement {
     this.params.bottom.set(this.currentParams.bottom.get() + dy);
   }
 
-  handleMouseMove(event: MouseEvent) { }
+  handleMouseMove(event: MouseEvent) {
+    if (!this.imgscrollOrigin) {
+      return
+    }
+
+    event.preventDefault();
+    if (!this.currentParams) {
+      return;
+    }
+    const origin = this.imgscrollOrigin;
+    if (event.clientX - origin.x == 0 && event.clientY - origin.y == 0) {
+      return;
+    }
+
+    const fractalFromScreen = this.fractalFromScreenTransform();
+    const src = fractalFromScreen.transformPoint(origin);
+    const dst = fractalFromScreen.transformPoint(new DOMPointReadOnly(event.clientX, event.clientY));
+
+    const dx = src.x - dst.x;
+    const dy = src.y - dst.y;
+
+    this.extraTransform = (new DOMMatrixReadOnly().translate(-dx, -dy));
+    this.redraw();
+  }
 
   handleMouseOut(event: MouseEvent) {
     this.imgscrollOrigin = undefined;
+    this.extraTransform = new DOMMatrixReadOnly();
   }
 }
