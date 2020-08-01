@@ -34,15 +34,24 @@ abstract class Container<T> {
 
     // Set the value.
     set(v: T) {
-        this.__value = v;
-        if (this.event) {
-            this.event.dispatchEvent(new CustomEvent("mui-value-change", { bubbles: true }));
-        }
+        this.__set(v);
     }
 
     // Unset the value.
     reset() {
-        this.__value = undefined;
+        this.__set(undefined);
+    }
+
+    // Copy the value (or lack thereof) from another similar container.
+    copyFrom(other: Container<T>) {
+        this.__set(other.__value);
+    }
+
+    private __set(v: T | undefined) {
+        if (v === this.__value) {
+            return;
+        }
+        this.__value = v;
         if (this.event) {
             this.event.dispatchEvent(new CustomEvent("mui-value-change", { bubbles: true }));
         }
@@ -214,6 +223,22 @@ export class Parameters {
 
     constructor(private event?: EventTarget) {
         this.type.values = ["mandelbrot", "julia"];
+    }
+
+    copyFrom(other: Parameters) {
+        for (const name of Object.getOwnPropertyNames(this)) {
+            const prop = this[name as (keyof Parameters)];
+            if (!(prop instanceof Container)) {
+                continue;
+            }
+            const otherprop = other[name as (keyof Parameters)];
+            if (!(otherprop instanceof Container)) {
+                continue;
+            }
+            // Type system does not know that we've picked the same properties
+            // and thus are of the same type.
+            (prop.copyFrom as any)(otherprop);
+        }
     }
 
     // Returns all parameters with their values. If the value has not been

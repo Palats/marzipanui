@@ -30,11 +30,15 @@ export class MarzipanUi extends LitElement {
   @query('#canvas')
   private canvas: HTMLCanvasElement | undefined;
 
-  // Rendering parameters of the fractal.
+  // Rendering parameters of the fractal. Those are the current one visible on
+  // the UI; those used for rendering are available in `currentParams`.
   private params: params.Parameters = new params.Parameters(this);
 
   @property({ attribute: false })
   private currentImg: HTMLImageElement | undefined;
+
+  // Parameters to use matching the `currentImg`.
+  private currentParams: params.Parameters | undefined;
 
   // Parameters for drag'n'drop style scrolling.
   private imgscroll = false;
@@ -157,13 +161,19 @@ export class MarzipanUi extends LitElement {
     if (this.currentImg && this.currentImg.src == newURL) {
       return;
     }
+
+    // Work with a copy of the params - this way, they will not change even when accessed from the callbacks.
+    const newParams = new params.Parameters();
+    newParams.copyFrom(this.params);
+
     console.log("update image:", newURL);
-    history.pushState(null, "", '?' + this.params.query());
+    history.pushState(null, "", '?' + newParams.query());
 
     const loadingImg = document.createElement("img");
     loadingImg.src = newURL;
     loadingImg.addEventListener("load", evt => {
       this.currentImg = loadingImg;
+      this.currentParams = newParams;
       this.redraw();
       this.imgError?.close();
       this.progress?.close();
@@ -228,13 +238,13 @@ export class MarzipanUi extends LitElement {
   }
 
   zoom(clientX: number, clientY: number, scale: number) {
-    if (!this.canvas) {
+    if (!this.canvas || !this.currentParams) {
       return;
     }
 
     // Size of the window in fractal space.
-    const sx = this.params.right.get() - this.params.left.get();
-    const sy = this.params.bottom.get() - this.params.top.get();
+    const sx = this.currentParams.right.get() - this.currentParams.left.get();
+    const sy = this.currentParams.bottom.get() - this.currentParams.top.get();
 
     // Window in screen spapce.
     const rect = this.canvas.getBoundingClientRect();
@@ -245,11 +255,12 @@ export class MarzipanUi extends LitElement {
     const ry = (clientY - rect.y) / rect.height;
 
     // Position of the click in fractal space.
-    const x = this.params.left.get() + sx * rx;
-    const y = this.params.top.get() + sy * ry;
+    const x = this.currentParams.left.get() + sx * rx;
+    const y = this.currentParams.top.get() + sy * ry;
 
     // Update the fractal space window to keep the mouse cursor in the same
     // place.
+    // We're updating the live params, not those frozen for rendering.
     this.params.left.set(x - rx * sx / scale);
     this.params.right.set(x + (1.0 - rx) * sx / scale);
     this.params.top.set(y - ry * sy / scale);
@@ -281,7 +292,7 @@ export class MarzipanUi extends LitElement {
     // accessible anymore, we avoid having inconsistent state.
     this.imgscroll = false
     event.preventDefault();
-    if (!this.canvas) {
+    if (!this.canvas || !this.currentParams) {
       return;
     }
 
@@ -295,16 +306,17 @@ export class MarzipanUi extends LitElement {
     }
 
     const rect = this.canvas.getBoundingClientRect();
-    const sx = this.params.right.get() - this.params.left.get();
-    const sy = this.params.bottom.get() - this.params.top.get();
+    const sx = this.currentParams.right.get() - this.currentParams.left.get();
+    const sy = this.currentParams.bottom.get() - this.currentParams.top.get();
 
     const dx = -clientdx * sx / rect.width;
     const dy = -clientdy * sy / rect.height;
 
-    this.params.left.set(this.params.left.get() + dx);
-    this.params.right.set(this.params.right.get() + dx);
-    this.params.top.set(this.params.top.get() + dy);
-    this.params.bottom.set(this.params.bottom.get() + dy);
+    // We're updating the live params, not those frozen for rendering.
+    this.params.left.set(this.currentParams.left.get() + dx);
+    this.params.right.set(this.currentParams.right.get() + dx);
+    this.params.top.set(this.currentParams.top.get() + dy);
+    this.params.bottom.set(this.currentParams.bottom.get() + dy);
   }
 
   handleMouseMove(event: MouseEvent) { }
