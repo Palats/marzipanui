@@ -15,6 +15,12 @@ import { LinearProgress } from '@material/mwc-linear-progress';
 
 import * as params from './params';
 
+// Coordinate spaces:
+//   fractal space: coordinate used to calculate the fractal (top/left/bottom/right are in fractal space).
+//   fractal image space: pixel coordinate when rendering - (top, left) of fractal space is (0, 0).
+//   canvas space: pixel coordinates within the canvas.
+//   screen space: pixel coordinates on the screen.
+
 @customElement('marzipan-ui')
 export class MarzipanUi extends LitElement {
 
@@ -41,13 +47,13 @@ export class MarzipanUi extends LitElement {
   private currentParams: params.Parameters | undefined;
 
   // Parameters for drag'n'drop style scrolling.
-  private imgscroll = false;
-  private imgscrollOriginX = 0;
-  private imgscrollOriginY = 0;
+  private imgscrollOrigin: DOMPointReadOnly | undefined;
 
   // If a request to reload the fractal is inflight, this will store the
-  // timoeutID.
+  // timeoutID.
   private reloadTimer: ReturnType<typeof setTimeout> | undefined;
+
+  private canvasFromFractal: DOMMatrixReadOnly | undefined;
 
   static styles = css`
     .checkered {
@@ -192,7 +198,7 @@ export class MarzipanUi extends LitElement {
     const canvas = this.canvas;
     const ctx = this.canvas?.getContext('2d');
     const img = this.currentImg;
-    if (!canvas || !ctx || !img) {
+    if (!canvas || !ctx || !img || !this.currentParams) {
       console.log('missing elements');
       return
     }
@@ -215,56 +221,76 @@ export class MarzipanUi extends LitElement {
     const dx = (width - img.width * scale) / 2.0;
     const dy = (height - img.height * scale) / 2.0;
 
+    const canvasFromFractalImg = (new DOMMatrixReadOnly()).scale(scale).translate(dx, dy);
+    const fractalImgFromFractal = (new DOMMatrixReadOnly())
+      .scale(
+        img.width / (this.currentParams.right.get() - this.currentParams.left.get()),
+        img.height / (this.currentParams.bottom.get() - this.currentParams.top.get()),
+      )
+      .translate(
+        -this.currentParams.left.get(),
+        -this.currentParams.top.get());
+
+    this.canvasFromFractal = canvasFromFractalImg.multiply(fractalImgFromFractal);
+
     // Draw.
     ctx.save();
     ctx.clearRect(0, 0, width, height);
-    ctx.translate(dx, dy);
-    ctx.scale(scale, scale);
+    ctx.setTransform(canvasFromFractalImg);
     ctx.drawImage(img, 0, 0);
     ctx.restore();
+  }
+
+  fractalFromScreenTransform(): DOMMatrixReadOnly {
+    if (!this.canvas || !this.canvasFromFractal) {
+      console.log("missing args");
+      return new DOMMatrixReadOnly();
+    }
+    const rect = this.canvas.getBoundingClientRect();
+
+    const canvasFromScreen = (new DOMMatrix)
+      .scale(this.canvas.width / rect.width, this.canvas.height / rect.height)
+      .translate(-rect.x, -rect.y);
+    const fractalFromCanvas = this.canvasFromFractal.inverse();
+    return fractalFromCanvas.multiply(canvasFromScreen);
   }
 
   handleWheel(event: WheelEvent) {
     event.preventDefault();
     console.log("wheel", event.deltaY);
     // negative up, positive down
-    const scale = 1.0 - 0.01 * event.deltaY;
+    const scale = 1.0 + 0.01 * event.deltaY;
     this.zoom(event.clientX, event.clientY, scale);
   }
 
   handleDblclick(event: WheelEvent) {
     event.preventDefault();
-    this.zoom(event.clientX, event.clientY, 1.5);
+    this.zoom(event.clientX, event.clientY, 0.7);
   }
 
   zoom(clientX: number, clientY: number, scale: number) {
-    if (!this.canvas || !this.currentParams) {
+    if (!this.currentParams) {
       return;
     }
 
-    // Size of the window in fractal space.
-    const sx = this.currentParams.right.get() - this.currentParams.left.get();
-    const sy = this.currentParams.bottom.get() - this.currentParams.top.get();
+    // Get the clicked point - we want to keep it on the same place on the screen.
+    const fractalFromScreen = this.fractalFromScreenTransform();
+    const pos = fractalFromScreen.transformPoint(new DOMPointReadOnly(clientX, clientY));
 
-    // Window in screen spapce.
-    const rect = this.canvas.getBoundingClientRect();
+    // As we want the clicked point to be a fixed point, we center on it, scale
+    // and reshift.
+    const resize = (new DOMMatrixReadOnly())
+      .translate(pos.x, pos.y)
+      .scale(scale)
+      .translate(-pos.x, -pos.y);
 
-    // Position of the mouse as a proportion, using top left screen space as
-    // reference.
-    const rx = (clientX - rect.x) / rect.width;
-    const ry = (clientY - rect.y) / rect.height;
+    const topleft = resize.transformPoint(new DOMPointReadOnly(this.currentParams.left.get(), this.currentParams.top.get()));
+    const bottomright = resize.transformPoint(new DOMPointReadOnly(this.currentParams.right.get(), this.currentParams.bottom.get()));
 
-    // Position of the click in fractal space.
-    const x = this.currentParams.left.get() + sx * rx;
-    const y = this.currentParams.top.get() + sy * ry;
-
-    // Update the fractal space window to keep the mouse cursor in the same
-    // place.
-    // We're updating the live params, not those frozen for rendering.
-    this.params.left.set(x - rx * sx / scale);
-    this.params.right.set(x + (1.0 - rx) * sx / scale);
-    this.params.top.set(y - ry * sy / scale);
-    this.params.bottom.set(y + (1.0 - ry) * sy / scale);
+    this.params.left.set(topleft.x);
+    this.params.top.set(topleft.y);
+    this.params.right.set(bottomright.x);
+    this.params.bottom.set(bottomright.y);
   }
 
   handleMouseDown(event: MouseEvent) {
@@ -274,9 +300,7 @@ export class MarzipanUi extends LitElement {
 
     event.preventDefault();
 
-    this.imgscroll = true;
-    this.imgscrollOriginX = event.clientX;
-    this.imgscrollOriginY = event.clientY;
+    this.imgscrollOrigin = new DOMPointReadOnly(event.clientX, event.clientY);
   }
 
   handleMouseUp(event: MouseEvent) {
@@ -284,33 +308,31 @@ export class MarzipanUi extends LitElement {
     if ((event.buttons & 1) == 1) {
       return
     }
-    if (!this.imgscroll) {
+    if (!this.imgscrollOrigin) {
       return
     }
 
     // Clear scrolling info - this way, even if for some reason img is not
     // accessible anymore, we avoid having inconsistent state.
-    this.imgscroll = false
+    const origin = this.imgscrollOrigin;
+    this.imgscrollOrigin = undefined
     event.preventDefault();
-    if (!this.canvas || !this.currentParams) {
+    if (!this.currentParams) {
       return;
     }
-
-    const clientdx = event.clientX - this.imgscrollOriginX;
-    const clientdy = event.clientY - this.imgscrollOriginY;
 
     // If there was no movement, that might have been a click, a doubleclick or
     // something not relevant.
-    if (clientdx == 0 && clientdy == 0) {
+    if (event.clientX - origin.x == 0 && event.clientY - origin.y == 0) {
       return;
     }
 
-    const rect = this.canvas.getBoundingClientRect();
-    const sx = this.currentParams.right.get() - this.currentParams.left.get();
-    const sy = this.currentParams.bottom.get() - this.currentParams.top.get();
+    const fractalFromScreen = this.fractalFromScreenTransform();
+    const src = fractalFromScreen.transformPoint(origin);
+    const dst = fractalFromScreen.transformPoint(new DOMPointReadOnly(event.clientX, event.clientY));
 
-    const dx = -clientdx * sx / rect.width;
-    const dy = -clientdy * sy / rect.height;
+    const dx = src.x - dst.x;
+    const dy = src.y - dst.y;
 
     // We're updating the live params, not those frozen for rendering.
     this.params.left.set(this.currentParams.left.get() + dx);
@@ -322,6 +344,6 @@ export class MarzipanUi extends LitElement {
   handleMouseMove(event: MouseEvent) { }
 
   handleMouseOut(event: MouseEvent) {
-    this.imgscroll = false;
+    this.imgscrollOrigin = undefined;
   }
 }
