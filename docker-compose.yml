@@ -3,7 +3,7 @@ services:
     ui:
         build: .
         ports:
-            - "8080:80"
+            - "9411:80"
         depends_on:
             - generator
 
