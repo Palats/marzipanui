@@ -305,17 +305,17 @@ export class MarzipanUi extends LitElement {
     this.params.top.set(topleft.y);
     this.params.right.set(bottomright.x);
     this.params.bottom.set(bottomright.y);
+
+    this.extraTransform = resize.inverse();
+    this.redraw();
   }
 
   handleMouseDown(event: MouseEvent) {
     if ((event.buttons & 1) == 0) {
       return
     }
-
     event.preventDefault();
-
     this.imgscrollOrigin = new DOMPointReadOnly(event.clientX, event.clientY);
-    this.extraTransform = new DOMMatrixReadOnly();
   }
 
   handleMouseUp(event: MouseEvent) {
@@ -384,5 +384,6 @@ export class MarzipanUi extends LitElement {
   handleMouseOut(event: MouseEvent) {
     this.imgscrollOrigin = undefined;
     this.extraTransform = new DOMMatrixReadOnly();
+    this.redraw();
   }
 }
