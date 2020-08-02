@@ -210,44 +210,48 @@ export class MarzipanUi extends LitElement {
 
     // Have 1:1 matching between canvas pixels & screen.
     // This allows drawing while keeping max resolution.
-    const width = canvas.clientWidth;
-    const height = canvas.clientHeight;
-    if (canvas.width !== width || canvas.height !== height) {
-      canvas.width = width;
-      canvas.height = height;
+    const cWidth = canvas.clientWidth;
+    const cHeight = canvas.clientHeight;
+    if (canvas.width !== cWidth || canvas.height !== cHeight) {
+      canvas.width = cWidth;
+      canvas.height = cHeight;
     }
 
-    // Maximize size of the image while keeping aspect ratio;
-    const xscale = width / img.width;
-    const yscale = height / img.height;
+    // Dimensions we have in fractal space.
+    const fPos = new DOMPointReadOnly(this.currentParams.left.get(), this.currentParams.top.get());
+    const fWidth = this.currentParams.right.get() - this.currentParams.left.get();
+    const fHeight = this.currentParams.bottom.get() - this.currentParams.top.get();
+
+    // Maximize size while keeping aspect ratio;
+    const xscale = cWidth / fWidth;
+    const yscale = cHeight / fHeight;
     const scale = xscale < yscale ? xscale : yscale;
 
-    // Add an offset to center the image on the available space.
-    const dx = (width - img.width * scale) / 2.0;
-    const dy = (height - img.height * scale) / 2.0;
-
-    const topleft = new DOMPointReadOnly(this.currentParams.left.get(), this.currentParams.top.get());
-
-    const canvasFromFractalImg = (new DOMMatrixReadOnly()).scale(scale).translate(dx, dy);
-    const fractalImgFromFractal = (new DOMMatrixReadOnly())
-      .scale(
-        img.width / (this.currentParams.right.get() - this.currentParams.left.get()),
-        img.height / (this.currentParams.bottom.get() - this.currentParams.top.get()),
-      )
+    this.canvasFromFractal = (new DOMMatrixReadOnly())
+      // Add an extra small delta to center when aspect ratio is not matching.
       .translate(
-        -topleft.x,
-        -topleft.y)
+        (cWidth - fWidth * scale) / 2.0,
+        (cHeight - fHeight * scale) / 2.0)
+      // Adjust for scale - data we have should cover mostly the canvas.
+      .scale(scale)
+      // Topleft of the data should be (0, 0).
+      .translate(-fPos.x, -fPos.y)
       .multiply(this.extraTransform);
 
-    this.canvasFromFractal = canvasFromFractalImg.multiply(fractalImgFromFractal);
+    const fractalFromFractalImg = (new DOMMatrixReadOnly())
+      // (0, 0) in image space is fPos in fractal space.
+      .translate(fPos.x, fPos.y)
+      .scale(
+        fWidth / img.width,
+        fHeight / img.height);
 
-    const ref = fractalImgFromFractal.transformPoint(topleft);
+    const canvasFromFractalImg = this.canvasFromFractal.multiply(fractalFromFractalImg);
 
     // Draw.
     ctx.save();
-    ctx.clearRect(0, 0, width, height);
+    ctx.clearRect(0, 0, cWidth, cHeight);
     ctx.setTransform(canvasFromFractalImg);
-    ctx.drawImage(img, ref.x, ref.y);
+    ctx.drawImage(img, 0, 0);
     ctx.restore();
   }
 
