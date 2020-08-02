@@ -298,16 +298,39 @@ export class MarzipanUi extends LitElement {
       .scale(scale)
       .translate(-pos.x, -pos.y);
 
-    const topleft = resize.transformPoint(new DOMPointReadOnly(this.currentParams.left.get(), this.currentParams.top.get()));
-    const bottomright = resize.transformPoint(new DOMPointReadOnly(this.currentParams.right.get(), this.currentParams.bottom.get()));
+    this.transform(resize);
+  }
+
+  transform(tr: DOMMatrixReadOnly) {
+    if (!this.currentParams) {
+      return;
+    }
+    if (tr.isIdentity) {
+      return;
+    }
+    const topleft = tr.transformPoint(new DOMPointReadOnly(this.currentParams.left.get(), this.currentParams.top.get()));
+    const bottomright = tr.transformPoint(new DOMPointReadOnly(this.currentParams.right.get(), this.currentParams.bottom.get()));
 
     this.params.left.set(topleft.x);
     this.params.top.set(topleft.y);
     this.params.right.set(bottomright.x);
     this.params.bottom.set(bottomright.y);
 
-    this.extraTransform = resize.inverse();
+    this.extraTransform = tr.inverse();
     this.redraw();
+  }
+
+  calcScroll(event: MouseEvent): DOMMatrixReadOnly {
+    if (!this.imgscrollOrigin) {
+      return new DOMMatrixReadOnly();
+    }
+    const origin = this.imgscrollOrigin;
+
+    const fractalFromScreen = this.fractalFromScreenTransform();
+    const src = fractalFromScreen.transformPoint(origin);
+    const dst = fractalFromScreen.transformPoint(new DOMPointReadOnly(event.clientX, event.clientY));
+
+    return (new DOMMatrixReadOnly()).translate(src.x - dst.x, src.y - dst.y);
   }
 
   handleMouseDown(event: MouseEvent) {
@@ -327,33 +350,10 @@ export class MarzipanUi extends LitElement {
       return
     }
 
-    // Clear scrolling info - this way, even if for some reason img is not
-    // accessible anymore, we avoid having inconsistent state.
-    const origin = this.imgscrollOrigin;
-    this.imgscrollOrigin = undefined
     event.preventDefault();
-    if (!this.currentParams) {
-      return;
-    }
-
-    // If there was no movement, that might have been a click, a doubleclick or
-    // something not relevant.
-    if (event.clientX - origin.x == 0 && event.clientY - origin.y == 0) {
-      return;
-    }
-
-    const fractalFromScreen = this.fractalFromScreenTransform();
-    const src = fractalFromScreen.transformPoint(origin);
-    const dst = fractalFromScreen.transformPoint(new DOMPointReadOnly(event.clientX, event.clientY));
-
-    const dx = src.x - dst.x;
-    const dy = src.y - dst.y;
-
-    // We're updating the live params, not those frozen for rendering.
-    this.params.left.set(this.currentParams.left.get() + dx);
-    this.params.right.set(this.currentParams.right.get() + dx);
-    this.params.top.set(this.currentParams.top.get() + dy);
-    this.params.bottom.set(this.currentParams.bottom.get() + dy);
+    const tr = this.calcScroll(event);
+    this.imgscrollOrigin = undefined;
+    this.transform(tr);
   }
 
   handleMouseMove(event: MouseEvent) {
@@ -362,22 +362,8 @@ export class MarzipanUi extends LitElement {
     }
 
     event.preventDefault();
-    if (!this.currentParams) {
-      return;
-    }
-    const origin = this.imgscrollOrigin;
-    if (event.clientX - origin.x == 0 && event.clientY - origin.y == 0) {
-      return;
-    }
-
-    const fractalFromScreen = this.fractalFromScreenTransform();
-    const src = fractalFromScreen.transformPoint(origin);
-    const dst = fractalFromScreen.transformPoint(new DOMPointReadOnly(event.clientX, event.clientY));
-
-    const dx = src.x - dst.x;
-    const dy = src.y - dst.y;
-
-    this.extraTransform = (new DOMMatrixReadOnly().translate(-dx, -dy));
+    const tr = this.calcScroll(event);
+    this.extraTransform = tr.inverse();
     this.redraw();
   }
 
