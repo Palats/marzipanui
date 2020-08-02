@@ -276,15 +276,15 @@ export class MarzipanUi extends LitElement {
 
   handleWheel(event: WheelEvent) {
     event.preventDefault();
-    console.log("wheel", event.deltaY);
     // negative up, positive down
-    const scale = 1.0 + 0.01 * event.deltaY;
+    const scale = event.deltaY > 0 ? 1.5 : 1 / 1.5;
+    console.log("wheel", event.deltaY, scale);
     this.zoom(event.clientX, event.clientY, scale);
   }
 
   handleDblclick(event: WheelEvent) {
     event.preventDefault();
-    this.zoom(event.clientX, event.clientY, 0.7);
+    this.zoom(event.clientX, event.clientY, 1 / 1.5);
   }
 
   zoom(clientX: number, clientY: number, scale: number) {
