@@ -25,3 +25,4 @@ RUN npm run build
 ### Run
 FROM nginx:stable AS run
 COPY --from=build /home/dockeruser/src/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/nginx.conf

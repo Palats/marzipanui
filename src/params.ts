@@ -231,7 +231,7 @@ class EditEnum extends LitElement {
 
 // Hold all parameters that Marzipan can accept.
 export class Parameters {
-    public address = new StringContainer("Address", "http://localhost:8080", this.event);
+    public address = new StringContainer("Address", "/_generator", this.event);
     public maxiter = new PositiveIntContainer("Max iterations", 100, this.event);
     public type = new EnumContainer("Fractal type", "mandelbrot", this.event);
 
