@@ -37,14 +37,30 @@ abstract class Container<T> {
         this.__set(v);
     }
 
+    // Update the default value.
+    setDefault(v: T) {
+        if (v == this.__default) {
+            return;
+        }
+        this.__default = v;
+        if (this.maybe() === undefined) {
+            this.__notify();
+        }
+    }
+
     // Unset the value.
     reset() {
         this.__set(undefined);
     }
 
-    // Copy the value (or lack thereof) from another similar container.
+    // Copy the value (or lack thereof) & default from another similar container.
     copyFrom(other: Container<T>) {
-        this.__set(other.__value);
+        if (this.__default === other.__default && this.__value === other.__value) {
+            return;
+        }
+        this.__default = other.__default;
+        this.__value = other.__value;
+        this.__notify();
     }
 
     private __set(v: T | undefined) {
@@ -52,6 +68,10 @@ abstract class Container<T> {
             return;
         }
         this.__value = v;
+        this.__notify();
+    }
+
+    private __notify() {
         if (this.event) {
             this.event.dispatchEvent(new CustomEvent("mui-value-change", { bubbles: true }));
         }
@@ -212,14 +232,19 @@ class EditEnum extends LitElement {
 // Hold all parameters that Marzipan can accept.
 export class Parameters {
     public address = new StringContainer("Address", "http://localhost:8080", this.event);
-    public left = new FloatContainer("Left", -2.0, this.event);
-    public right = new FloatContainer("Right", 1.0, this.event);
-    public top = new FloatContainer("Top", -1.0, this.event);
-    public bottom = new FloatContainer("Bottom", 1.0, this.event);
-    public width = new PositiveIntContainer("Width", 900, this.event);
-    public height = new PositiveIntContainer("Height", 600, this.event);
     public maxiter = new PositiveIntContainer("Max iterations", 100, this.event);
     public type = new EnumContainer("Fractal type", "mandelbrot", this.event);
+
+    public x = new FloatContainer("Center X", -0.5, this.event);
+    public y = new FloatContainer("Center Y", 0, this.event);
+    public size = new FloatContainer("Size", 3.0, this.event);
+    public ratio = new FloatContainer("Ratio", 1.0, this.event);
+    public pixels = new PositiveIntContainer("Pixels", 900, this.event);
+
+    left(): number { return this.x.get() - 0.5 * this.size.get(); }
+    right(): number { return this.x.get() + 0.5 * this.size.get(); }
+    top(): number { return this.y.get() - 0.5 * this.size.get() / this.ratio.get(); }
+    bottom(): number { return this.y.get() + 0.5 * this.size.get() / this.ratio.get(); }
 
     constructor(private event?: EventTarget) {
         this.type.values = ["mandelbrot", "julia"];
@@ -279,8 +304,15 @@ export class Parameters {
 
     // Returns the URL of the generated fractal.
     url() {
-        let values = this.__values();
-        delete values.address;
+        const values: Record<string, string> = {};
+        values.left = this.left().toString();
+        values.right = this.right().toString();
+        values.top = this.top().toString();
+        values.bottom = this.bottom().toString();
+        values.width = this.pixels.getAsString();
+        values.height = Math.round(this.pixels.get() / this.ratio.get()).toString();
+        values.maxiter = this.maxiter.getAsString();
+        values.type = this.type.getAsString();
         const q = new URLSearchParams(values);
         return this.address.get() + '?' + q.toString();
     }

@@ -96,16 +96,15 @@ export class MarzipanUi extends LitElement {
           </div>
           <h4>Position</h4>
           <div>
-            ${this.params.left.newElement()}
-            ${this.params.right.newElement()}
-            ${this.params.top.newElement()}
-            ${this.params.bottom.newElement()}
+            ${this.params.x.newElement()}
+            ${this.params.y.newElement()}
+            ${this.params.size.newElement()}
+            ${this.params.ratio.newElement()}
           </div>
           <h4>Rendering</h4>
           <div>
             ${this.params.maxiter.newElement()}
-            ${this.params.width.newElement()}
-            ${this.params.height.newElement()}
+            ${this.params.pixels.newElement()}
           </div>
           <h4>Network</h4>
           <div>
@@ -151,7 +150,19 @@ export class MarzipanUi extends LitElement {
     this.shadowRoot?.addEventListener('MDCTopAppBar:nav', () => {
       drawer.open = !drawer.open;
     });
+
     (new ResizeObserver(entries => {
+      const canvas = this.canvas;
+      if (!canvas) { return; }
+      // Have 1:1 matching between canvas pixels & screen.
+      // This allows drawing while keeping max resolution.
+      const cWidth = canvas.clientWidth;
+      const cHeight = canvas.clientHeight;
+      if (canvas.width !== cWidth || canvas.height !== cHeight) {
+        canvas.width = cWidth;
+        canvas.height = cHeight;
+        this.params.ratio.setDefault(cWidth / cHeight);
+      }
       this.redraw();
     })).observe(this.canvas!);
   }
@@ -208,19 +219,13 @@ export class MarzipanUi extends LitElement {
       return
     }
 
-    // Have 1:1 matching between canvas pixels & screen.
-    // This allows drawing while keeping max resolution.
-    const cWidth = canvas.clientWidth;
-    const cHeight = canvas.clientHeight;
-    if (canvas.width !== cWidth || canvas.height !== cHeight) {
-      canvas.width = cWidth;
-      canvas.height = cHeight;
-    }
+    const cWidth = canvas.width;
+    const cHeight = canvas.height;
 
     // Dimensions we have in fractal space.
-    const fPos = new DOMPointReadOnly(this.currentParams.left.get(), this.currentParams.top.get());
-    const fWidth = this.currentParams.right.get() - this.currentParams.left.get();
-    const fHeight = this.currentParams.bottom.get() - this.currentParams.top.get();
+    const fPos = new DOMPointReadOnly(this.currentParams.left(), this.currentParams.top());
+    const fWidth = this.currentParams.right() - this.currentParams.left();
+    const fHeight = this.currentParams.bottom() - this.currentParams.top();
 
     // Maximize size while keeping aspect ratio;
     const xscale = cWidth / fWidth;
@@ -228,7 +233,7 @@ export class MarzipanUi extends LitElement {
     const scale = xscale < yscale ? xscale : yscale;
 
     this.canvasFromFractal = (new DOMMatrixReadOnly())
-      // Add an extra small delta to center when aspect ratio is not matching.
+      // Add an extra delta to center when aspect ratio is not matching.
       .translate(
         (cWidth - fWidth * scale) / 2.0,
         (cHeight - fHeight * scale) / 2.0)
@@ -308,13 +313,15 @@ export class MarzipanUi extends LitElement {
     if (tr.isIdentity) {
       return;
     }
-    const topleft = tr.transformPoint(new DOMPointReadOnly(this.currentParams.left.get(), this.currentParams.top.get()));
-    const bottomright = tr.transformPoint(new DOMPointReadOnly(this.currentParams.right.get(), this.currentParams.bottom.get()));
 
-    this.params.left.set(topleft.x);
-    this.params.top.set(topleft.y);
-    this.params.right.set(bottomright.x);
-    this.params.bottom.set(bottomright.y);
+    const center = tr.transformPoint(new DOMPointReadOnly(this.currentParams.x.get(), this.currentParams.y.get()));
+    this.params.x.set(center.x);
+    this.params.y.set(center.y);
+
+    // Set 4th parameter to 0 - this way the transform will not apply the
+    // translation.
+    const sizeVec = tr.transformPoint(new DOMPointReadOnly(this.currentParams.size.get(), 0, 0, 0));
+    this.params.size.set(sizeVec.x);
 
     this.extraTransform = tr.inverse();
     this.redraw();
@@ -368,6 +375,9 @@ export class MarzipanUi extends LitElement {
   }
 
   handleMouseOut(event: MouseEvent) {
+    if (!this.imgscrollOrigin) {
+      return;
+    }
     this.imgscrollOrigin = undefined;
     this.extraTransform = new DOMMatrixReadOnly();
     this.redraw();
