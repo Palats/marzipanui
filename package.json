@@ -5,7 +5,7 @@
   "author": "marzipan-ui",
   "license": "MIT",
   "scripts": {
-    "start": "concurrently --kill-others --names tsc,es-dev-server \"npm run tsc:watch\" \"es-dev-server --app-index index.html --node-resolve --open --watch\"",
+    "start": "concurrently --kill-others --names tsc,es-dev-server \"npm run tsc:watch\" \"es-dev-server\"",
     "tsc:watch": "tsc --watch",
     "build": "rimraf dist && tsc && rollup -c rollup.config.js",
     "start:build": "npm run build && es-dev-server --root-dir dist --app-index index.html --open --compatibility none"
@@ -28,13 +28,14 @@
     "lit-html": "^1.0.0"
   },
   "devDependencies": {
-    "@types/node": "13.11.1",
-    "es-dev-server": "^1.5.0",
-    "typescript": "~3.8.2",
-    "concurrently": "^5.1.0",
-    "tslib": "^1.11.0",
     "@open-wc/building-rollup": "^1.0.0",
+    "@types/node": "13.11.1",
+    "concurrently": "^5.1.0",
+    "es-dev-server": "^1.5.0",
+    "koa-proxies": "^0.11.0",
     "rimraf": "^2.6.3",
-    "rollup": "^2.3.4"
+    "rollup": "^2.3.4",
+    "tslib": "^1.11.0",
+    "typescript": "~3.8.2"
   }
 }
