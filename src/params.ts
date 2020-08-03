@@ -12,11 +12,24 @@ class Invalid {
     constructor(public msg: string) { }
 }
 
+interface ContainerInit<T> {
+    caption: string;
+    default: T;
+    event?: EventTarget;
+}
+
 // Encapsulate a string value which can be unset & have a default value.
 abstract class Container<T> {
+    readonly caption: string;
     private __value: T | undefined;
+    private __default: T;
+    private event: EventTarget | undefined;
 
-    constructor(public caption: string, private __default: T, private event?: EventTarget) { }
+    constructor(init: ContainerInit<T>) {
+        this.caption = init.caption;
+        this.__default = init.default;
+        this.event = init.event;
+    }
 
     // get the value or, if undefined, the default value.
     get(): T {
@@ -158,8 +171,17 @@ class PositiveIntContainer extends Container<number> {
     newElement() { return new EditNumber(this); }
 }
 
+interface EnumInit extends ContainerInit<string> {
+    values: string[];
+}
+
 class EnumContainer extends Container<string> {
     values: string[] = [];
+
+    constructor(init: EnumInit) {
+        super(init);
+        this.values = init.values;
+    }
 
     fromString(v: string): string | Invalid {
         return v;
@@ -240,6 +262,7 @@ class EditString<T> extends LitElement {
     }
 }
 
+
 @customElement('mui-edit-enum')
 class EditEnum extends LitElement {
     constructor(public data: EnumContainer) { super(); }
@@ -276,24 +299,55 @@ class EditEnum extends LitElement {
 
 // Hold all parameters that Marzipan can accept.
 export class Parameters {
-    public address = new StringContainer("Address", "/_generator", this.event);
-    public maxiter = new PositiveIntContainer("Max iterations", 100, this.event);
-    public type = new EnumContainer("Fractal type", "mandelbrot", this.event);
+    public address = new StringContainer({
+        caption: "Address",
+        default: "/_generator",
+        event: this.event,
+    });
+    public maxiter = new PositiveIntContainer({
+        caption: "Max iterations",
+        default: 100,
+        event: this.event,
+    });
+    public type = new EnumContainer({
+        caption: "Fractal type",
+        default: "mandelbrot",
+        values: ["mandelbrot", "julia"],
+        event: this.event,
+    });
 
-    public x = new FloatContainer("Center X", -0.5, this.event);
-    public y = new FloatContainer("Center Y", 0, this.event);
-    public size = new FloatContainer("Size", 3.0, this.event);
-    public ratio = new FloatContainer("Ratio", 1.0, this.event);
-    public pixels = new PositiveIntContainer("Pixels", 900, this.event);
+    public x = new FloatContainer({
+        caption: "Center X",
+        default: -0.5,
+        event: this.event,
+    });
+    public y = new FloatContainer({
+        caption: "Center Y",
+        default: 0,
+        event: this.event,
+    });
+    public size = new FloatContainer({
+        caption: "Size",
+        default: 3.0,
+        event: this.event,
+    });
+    public ratio = new FloatContainer({
+        caption: "Ratio",
+        default: 1.0,
+        event: this.event,
+    });
+    public pixels = new PositiveIntContainer({
+        caption: "Pixels",
+        default: 900,
+        event: this.event,
+    });
 
     left(): number { return this.x.get() - 0.5 * this.size.get(); }
     right(): number { return this.x.get() + 0.5 * this.size.get(); }
     top(): number { return this.y.get() - 0.5 * this.size.get() / this.ratio.get(); }
     bottom(): number { return this.y.get() + 0.5 * this.size.get() / this.ratio.get(); }
 
-    constructor(private event?: EventTarget) {
-        this.type.values = ["mandelbrot", "julia"];
-    }
+    constructor(private event?: EventTarget) { }
 
     copyFrom(other: Parameters) {
         for (const name of Object.getOwnPropertyNames(this)) {
