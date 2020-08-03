@@ -7,6 +7,10 @@ import '@material/mwc-list/mwc-list-item';
 
 import { TextField } from '@material/mwc-textfield';
 
+// Represents an invalid conversion from string.
+class Invalid {
+    constructor(public msg: string) { }
+}
 
 // Encapsulate a string value which can be unset & have a default value.
 abstract class Container<T> {
@@ -77,10 +81,6 @@ abstract class Container<T> {
         }
     }
 
-    abstract fromString(v: string): T;
-    abstract toString(v: T): string;
-    abstract validate(s: string): boolean;
-
     getAsString(): string { return this.toString(this.get()); }
     maybeAsString(): string | undefined {
         const v = this.maybe();
@@ -90,34 +90,70 @@ abstract class Container<T> {
         return this.toString(v);
     };
     defaultAsString(): string { return this.toString(this.default()); }
-    setFromString(v: string): void { this.set(this.fromString(v)); }
+    setFromString(v: string): void {
+        const x = this.fromString(v);
+        if (x instanceof Invalid) {
+            if (v == "") {
+                this.reset();
+                return;
+            }
+            throw new Error(`cannot set from string "${v}"`);
+        }
+        this.set(x);
+    }
+
+    // Indicates if the provided string is valid or empty.
+    // This uses `fromString` to determine validity.
+    valid(v: string): boolean {
+        const x = this.fromString(v);
+        return v == "" || !(x instanceof Invalid);
+    }
+
+    // Methods to implements for specific containers.
+
+    // Convert from a string representation to the actual value. Return
+    // `Invalid` if the string does not contain a valid value. If empty string
+    // is supported, it should return the corresponding type - otherwise it
+    // should return invalid. Some other part might decide then to consider
+    // "empty string" as a way to reset to default.
+    abstract fromString(v: string): T | Invalid;
+    // Create a string from the value; returned value should work if sent to
+    // fromString.
+    abstract toString(v: T): string;
 }
 
 class StringContainer extends Container<string> {
     fromString(v: string): string { return v; }
     toString(v: string): string { return v; }
-    validate(s: string): boolean { return true; }
 
     newElement() { return new EditString(this); }
 }
 
 class FloatContainer extends Container<number> {
-    fromString(v: string): number { return parseFloat(v); }
-    toString(v: number): string { return v.toString(); }
-    validate(s: string): boolean {
-        return !isNaN(parseFloat(s));
+    fromString(v: string): number | Invalid {
+        const x = parseFloat(v);
+        if (isNaN(x)) {
+            return new Invalid("invalid number");
+        }
+        return x;
     }
+    toString(v: number): string { return v.toString(); }
 
     newElement() { return new EditNumber(this); }
 }
 
 class PositiveIntContainer extends Container<number> {
-    fromString(v: string): number { return parseInt(v, 10); }
-    toString(v: number): string { return v.toString(); }
-    validate(s: string) {
-        const v = parseInt(s, 10);
-        return s == "" || (!isNaN(v) && v > 0)
+    fromString(v: string): number | Invalid {
+        const x = parseInt(v, 10);
+        if (isNaN(x)) {
+            return new Invalid("not a number");
+        }
+        if (x < 0) {
+            return new Invalid("must be positive");
+        }
+        return x;
     }
+    toString(v: number): string { return v.toString(); }
 
     newElement() { return new EditNumber(this); }
 }
@@ -125,9 +161,10 @@ class PositiveIntContainer extends Container<number> {
 class EnumContainer extends Container<string> {
     values: string[] = [];
 
-    fromString(v: string): string { return v; }
+    fromString(v: string): string | Invalid {
+        return v;
+    }
     toString(v: string): string { return v; }
-    validate(s: string): boolean { return true; }
 
     newElement() { return new EditEnum(this); }
 }
@@ -156,9 +193,7 @@ class EditNumber<T> extends LitElement {
     }
 
     validity(s: string): Partial<ValidityState> {
-        return {
-            valid: this.data.validate(s),
-        }
+        return { valid: this.data.valid(s) };
     }
 
     handleChange(event: Event) {
@@ -185,9 +220,14 @@ class EditString<T> extends LitElement {
         label="${this.data.caption}"
         placeholder="${this.data.defaultAsString()}"
         value="${ifDefined(this.data.maybeAsString())}"
+        .validityTransform="${(s: string) => this.validity(s)}"
         @change="${this.handleChange}">
       </mwc-textfield>
     `;
+    }
+
+    validity(s: string): Partial<ValidityState> {
+        return { valid: this.data.valid(s) };
     }
 
     handleChange(event: Event) {
@@ -212,10 +252,15 @@ class EditEnum extends LitElement {
       <mwc-select
         id='field'
         label="${this.data.caption}"
+        .validityTransform="${(s: string) => this.validity(s)}"
         @change="${this.handleChange}">
         ${this.data.values.map((v) => html`<mwc-list-item value="${v}" ?selected=${v == this.data.get()}>${v}</mwc-list-item>`)}
       </mwc-select>
     `;
+    }
+
+    validity(s: string): Partial<ValidityState> {
+        return { valid: this.data.valid(s) };
     }
 
     handleChange(event: Event) {
