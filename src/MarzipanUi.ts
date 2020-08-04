@@ -188,7 +188,8 @@ export class MarzipanUi extends LitElement {
     newParams.copyFrom(this.params);
 
     console.log("update image:", newURL);
-    history.pushState(null, "", '?' + newParams.query());
+    const q = newParams.query();
+    history.pushState(null, "", q ? '?' + q : '');
 
     const loadingImg = document.createElement("img");
     loadingImg.src = newURL;
