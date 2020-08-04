@@ -184,6 +184,9 @@ class EnumContainer extends Container<string> {
     }
 
     fromString(v: string): string | Invalid {
+        if (this.values.indexOf(v) < 0) {
+            return new Invalid(`invalid value '${v}`);
+        }
         return v;
     }
     toString(v: string): string { return v; }
@@ -271,18 +274,23 @@ class EditEnum extends LitElement {
     field: TextField | undefined;
 
     render() {
+        const selected = this.data.maybe();
         return html`
       <mwc-select
         id='field'
         label="${this.data.caption}"
         .validityTransform="${(s: string) => this.validity(s)}"
         @change="${this.handleChange}">
-        ${this.data.values.map((v) => html`<mwc-list-item value="${v}" ?selected=${v == this.data.get()}>${v}</mwc-list-item>`)}
+        <mwc-list-item value="<default>" ?selected=${selected === undefined}>Default (${this.data.defaultAsString()})</mwc-list-item>
+        ${this.data.values.map((v) => html`<mwc-list-item value="${v}" ?selected=${v === selected}>${v}</mwc-list-item>`)}
       </mwc-select>
     `;
     }
 
     validity(s: string): Partial<ValidityState> {
+        if (s === "<default>") {
+            s = "";
+        }
         return { valid: this.data.valid(s) };
     }
 
@@ -291,7 +299,8 @@ class EditEnum extends LitElement {
             console.log("invalid value");
             return;
         }
-        this.data.setFromString(this.field.value);
+        const v = this.field.value === "<default>" ? "" : this.field.value;
+        this.data.setFromString(v);
         this.dispatchEvent(new CustomEvent("mui-value-change", { bubbles: true }));
     }
 }
