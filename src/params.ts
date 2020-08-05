@@ -305,6 +305,8 @@ class EditEnum extends LitElement {
     }
 }
 
+// type Plop = Extract<Parameters[keyof Parameters], extends Container<infer T> >;
+// type T = Container<A>
 
 // Hold all parameters that Marzipan can accept.
 export class Parameters {
@@ -358,12 +360,18 @@ export class Parameters {
 
     constructor(private event?: EventTarget) { }
 
-    copyFrom(other: Parameters) {
+    *props() {
         for (const name of Object.getOwnPropertyNames(this)) {
             const prop = this[name as (keyof Parameters)];
             if (!(prop instanceof Container)) {
                 continue;
             }
+            yield [name, prop] as [string, Container<any>];
+        }
+    }
+
+    copyFrom(other: Parameters) {
+        for (const [name, prop] of this.props()) {
             const otherprop = other[name as (keyof Parameters)];
             if (!(otherprop instanceof Container)) {
                 continue;
@@ -378,11 +386,7 @@ export class Parameters {
     // explictly set, the default value will be used.
     private __values(): Record<string, string> {
         let values: Record<string, string> = {};
-        for (const name of Object.getOwnPropertyNames(this)) {
-            const prop = this[name as (keyof Parameters)];
-            if (!(prop instanceof Container)) {
-                continue;
-            }
+        for (const [name, prop] of this.props()) {
             values[name] = prop.getAsString();
         }
         return values;
@@ -391,11 +395,7 @@ export class Parameters {
     // Returns all parameter which have an explicit value.
     private __maybe_values(): Record<string, string> {
         let values: Record<string, string> = {};
-        for (const name of Object.getOwnPropertyNames(this)) {
-            const prop = this[name as (keyof Parameters)];
-            if (!(prop instanceof Container)) {
-                continue;
-            }
+        for (const [name, prop] of this.props()) {
             let v = prop.maybeAsString();
             if (v === undefined) {
                 continue
@@ -427,13 +427,7 @@ export class Parameters {
 
     // Set the parameters based on the provided query parameters.
     from(p: URLSearchParams) {
-        let params = new URLSearchParams(document.location.search);
-        let values: Record<string, string> = {};
-        for (const name of Object.getOwnPropertyNames(this)) {
-            const prop = this[name as (keyof Parameters)];
-            if (!(prop instanceof Container)) {
-                continue;
-            }
+        for (const [name, prop] of this.props()) {
             const v = p.get(name);
             if (v === null) {
                 continue
