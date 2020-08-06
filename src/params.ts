@@ -136,7 +136,12 @@ abstract class Container<T> {
 }
 
 class StringContainer extends Container<string> {
-    fromString(v: string): string { return v; }
+    fromString(v: string): string | Invalid {
+        if (v === "") {
+            return new Invalid("empty string");
+        }
+        return v;
+    }
     toString(v: string): string { return v; }
 
     newElement() { return new EditString(this); }
@@ -353,6 +358,12 @@ export class Parameters {
         event: this.event,
     });
 
+    public extra = new StringContainer({
+        caption: "Extra query args",
+        default: "",
+        event: this.event,
+    });
+
     left(): number { return this.x.get() - 0.5 * this.size.get(); }
     right(): number { return this.x.get() + 0.5 * this.size.get(); }
     top(): number { return this.y.get() - 0.5 * this.size.get() / this.ratio.get(); }
@@ -422,7 +433,11 @@ export class Parameters {
         values.maxiter = this.maxiter.getAsString();
         values.type = this.type.getAsString();
         const q = new URLSearchParams(values);
-        return this.address.get() + '?' + q.toString();
+        let u = this.address.get() + '?' + q.toString();
+        if (this.extra.get()) {
+            u += '&' + this.extra.get();
+        }
+        return u;
     }
 
     // Set the parameters based on the provided query parameters.

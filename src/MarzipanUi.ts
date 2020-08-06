@@ -108,6 +108,7 @@ export class MarzipanUi extends LitElement {
           </div>
           <h4>Network</h4>
           <div>
+            ${this.params.extra.newElement()}
             ${this.params.address.newElement()}
           </div>
         </div>
