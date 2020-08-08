@@ -38,7 +38,7 @@ export class MarzipanUi extends LitElement {
 
   // Rendering parameters of the fractal. Those are the current one visible on
   // the UI; those used for rendering are available in `currentParams`.
-  private params: params.Parameters = new params.Parameters(this);
+  private params: params.Parameters = new params.Parameters();
 
   @property({ attribute: false })
   private currentImg: HTMLImageElement | undefined;
@@ -72,7 +72,7 @@ export class MarzipanUi extends LitElement {
   `
   constructor() {
     super();
-    this.addEventListener('mui-value-change', () => {
+    this.params.event.addEventListener('mui-value-change', () => {
       this.queueImageChange();
     })
     window.addEventListener('popstate', () => this.handleLocationChange());
@@ -92,24 +92,24 @@ export class MarzipanUi extends LitElement {
         <div>
           <h4>Fractal</h4>
           <div>
-          ${this.params.type.newElement()}
+          ${this.params.type.render()}
           </div>
           <h4>Position</h4>
           <div>
-            ${this.params.x.newElement()}
-            ${this.params.y.newElement()}
-            ${this.params.size.newElement()}
-            ${this.params.ratio.newElement()}
+            ${this.params.x.render()}
+            ${this.params.y.render()}
+            ${this.params.size.render()}
+            ${this.params.ratio.render()}
           </div>
           <h4>Rendering</h4>
           <div>
-            ${this.params.maxiter.newElement()}
-            ${this.params.pixels.newElement()}
+            ${this.params.maxiter.render()}
+            ${this.params.pixels.render()}
           </div>
           <h4>Network</h4>
           <div>
-            ${this.params.extra.newElement()}
-            ${this.params.address.newElement()}
+            ${this.params.extra.render()}
+            ${this.params.address.render()}
           </div>
         </div>
 

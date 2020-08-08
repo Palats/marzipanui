@@ -1,4 +1,4 @@
-import { LitElement, html, customElement, query } from 'lit-element';
+import { LitElement, html, customElement, query, property, internalProperty, PropertyValues } from 'lit-element';
 import { ifDefined } from 'lit-html/directives/if-defined';
 
 import '@material/mwc-textfield';
@@ -6,6 +6,7 @@ import '@material/mwc-select';
 import '@material/mwc-list/mwc-list-item';
 
 import { TextField } from '@material/mwc-textfield';
+import { assert } from 'console';
 
 // Represents an invalid conversion from string.
 class Invalid {
@@ -15,7 +16,6 @@ class Invalid {
 interface ContainerInit<T> {
     caption: string;
     default: T;
-    event?: EventTarget;
 }
 
 // Encapsulate a string value which can be unset & have a default value.
@@ -23,12 +23,12 @@ abstract class Container<T> {
     readonly caption: string;
     private __value: T | undefined;
     private __default: T;
-    private event: EventTarget | undefined;
+    public event: EventTarget;
 
     constructor(init: ContainerInit<T>) {
         this.caption = init.caption;
         this.__default = init.default;
-        this.event = init.event;
+        this.event = new EventTarget();
     }
 
     // get the value or, if undefined, the default value.
@@ -89,9 +89,7 @@ abstract class Container<T> {
     }
 
     private __notify() {
-        if (this.event) {
-            this.event.dispatchEvent(new CustomEvent("mui-value-change", { bubbles: true }));
-        }
+        this.event.dispatchEvent(new CustomEvent("mui-value-change", { bubbles: true }));
     }
 
     getAsString(): string { return this.toString(this.get()); }
@@ -144,7 +142,7 @@ class StringContainer extends Container<string> {
     }
     toString(v: string): string { return v; }
 
-    newElement() { return new EditString(this); }
+    render() { return html`<mui-edit-string .data="${this}"></mui-edit-string>`; }
 }
 
 class FloatContainer extends Container<number> {
@@ -157,7 +155,7 @@ class FloatContainer extends Container<number> {
     }
     toString(v: number): string { return v.toString(); }
 
-    newElement() { return new EditNumber(this); }
+    render() { return html`<mui-edit-number .data="${this}"></mui-edit-number>`; }
 }
 
 class PositiveIntContainer extends Container<number> {
@@ -173,7 +171,7 @@ class PositiveIntContainer extends Container<number> {
     }
     toString(v: number): string { return v.toString(); }
 
-    newElement() { return new EditNumber(this); }
+    render() { return html`<mui-edit-number .data="${this}"></mui-edit-number>`; }
 }
 
 interface EnumInit extends ContainerInit<string> {
@@ -196,172 +194,211 @@ class EnumContainer extends Container<string> {
     }
     toString(v: string): string { return v; }
 
-    newElement() { return new EditEnum(this); }
+    render() { return html`<mui-edit-enum .data="${this}"></mui-edit-enum>`; }
 }
 
 @customElement('mui-edit-number')
-class EditNumber<T> extends LitElement {
-    constructor(public data: Container<T>) { super(); }
+class EditNumber extends LitElement {
+    @property({ type: Object })
+    data: Container<any> | undefined;
 
     @query('#field')
     field: TextField | undefined;
 
+    private unregister: () => void = () => { };
+
+    updated(changedProperties: PropertyValues) {
+        if (changedProperties.get("data") === this.data) { return; }
+        this.unregister();
+        if (this.data) {
+            const f = () => this.requestUpdate();
+            this.data.event.addEventListener("mui-value-change", f);
+            this.unregister = () => {
+                this.data?.event.removeEventListener("mui-value-change", f);
+                this.unregister = () => { };
+            }
+        }
+    }
+
     render() {
+        if (!this.data) { return html``; }
+
         return html`
-      <mwc-textfield
-        id='field'
-        label="${this.data.caption}"
-        placeholder="${this.data.defaultAsString()}"
-        value="${ifDefined(this.data.maybeAsString())}"
-        @change="${this.handleChange}"
-        type="number"
-        .validityTransform="${(s: string) => this.validity(s)}"
-        validationMessage="Invalid value"
-        endaligned>
-      </mwc-textfield>
-    `;
+            <mwc-textfield
+                id='field'
+                label="${this.data.caption}"
+                placeholder="${this.data.defaultAsString()}"
+                value="${ifDefined(this.data.maybeAsString())}"
+                @change="${this.handleChange}"
+                .validityTransform="${(s: string) => this.validity(s)}"
+                validationMessage="Invalid value"
+                endaligned>
+            </mwc-textfield>
+        `;
     }
 
     validity(s: string): Partial<ValidityState> {
-        return { valid: this.data.valid(s) };
+        console.log("validity");
+        return { valid: this.data ? this.data.valid(s) : false };
     }
 
     handleChange(event: Event) {
-        if (!this.field || !this.field.validity.valid) {
+        if (!this.data || !this.field || !this.field.validity.valid) {
             console.log("invalid value");
             return;
         }
         this.data.setFromString(this.field.value);
-        this.dispatchEvent(new CustomEvent("mui-value-change", { bubbles: true }));
     }
 }
 
 @customElement('mui-edit-string')
 class EditString<T> extends LitElement {
-    constructor(public data: Container<T>) { super(); }
+    @property({ type: Object })
+    data: StringContainer | undefined;
 
     @query('#field')
     field: TextField | undefined;
 
+    private unregister: () => void = () => { };
+
+    updated(changedProperties: PropertyValues) {
+        if (changedProperties.get("data") === this.data) { return; }
+        this.unregister();
+        if (this.data) {
+            const f = () => this.requestUpdate();
+            this.data.event.addEventListener("mui-value-change", f);
+            this.unregister = () => {
+                this.data?.event.removeEventListener("mui-value-change", f);
+                this.unregister = () => { };
+            }
+        }
+    }
+
     render() {
+        if (!this.data) { return html``; }
         return html`
-      <mwc-textfield
-        id='field'
-        label="${this.data.caption}"
-        placeholder="${this.data.defaultAsString()}"
-        value="${ifDefined(this.data.maybeAsString())}"
-        .validityTransform="${(s: string) => this.validity(s)}"
-        @change="${this.handleChange}">
-      </mwc-textfield>
-    `;
+            <mwc-textfield
+                id='field'
+                label="${this.data.caption}"
+                placeholder="${this.data.defaultAsString()}"
+                value="${ifDefined(this.data.maybeAsString())}"
+                .validityTransform="${(s: string) => this.validity(s)}"
+                @change="${this.handleChange}">
+            </mwc-textfield>
+        `;
     }
 
     validity(s: string): Partial<ValidityState> {
-        return { valid: this.data.valid(s) };
+        return { valid: this.data ? this.data.valid(s) : false };
     }
 
     handleChange(event: Event) {
-        if (!this.field || !this.field.validity.valid) {
+        if (!this.data || !this.field || !this.field.validity.valid) {
             console.log("invalid value");
             return;
         }
         this.data.setFromString(this.field.value);
-        this.dispatchEvent(new CustomEvent("mui-value-change", { bubbles: true }));
     }
 }
 
 
 @customElement('mui-edit-enum')
 class EditEnum extends LitElement {
-    constructor(public data: EnumContainer) { super(); }
+    @property({ type: Object })
+    data: EnumContainer | undefined;
 
     @query('#field')
     field: TextField | undefined;
 
+    private unregister: () => void = () => { };
+
+    updated(changedProperties: PropertyValues) {
+        if (changedProperties.get("data") === this.data) { return; }
+        this.unregister();
+        if (this.data) {
+            const f = () => this.requestUpdate();
+            this.data.event.addEventListener("mui-value-change", f);
+            this.unregister = () => {
+                this.data?.event.removeEventListener("mui-value-change", f);
+                this.unregister = () => { };
+            }
+        }
+    }
+
     render() {
+        if (!this.data) { return html``; }
         const selected = this.data.maybe();
         return html`
-      <mwc-select
-        id='field'
-        label="${this.data.caption}"
-        .validityTransform="${(s: string) => this.validity(s)}"
-        @change="${this.handleChange}">
-        <mwc-list-item value="<default>" ?selected=${selected === undefined}>Default (${this.data.defaultAsString()})</mwc-list-item>
-        ${this.data.values.map((v) => html`<mwc-list-item value="${v}" ?selected=${v === selected}>${v}</mwc-list-item>`)}
-      </mwc-select>
-    `;
+            <mwc-select
+                id='field'
+                label="${this.data.caption}"
+                .validityTransform="${(s: string) => this.validity(s)}"
+                @change="${this.handleChange}">
+                <mwc-list-item value="<default>" ?selected=${selected === undefined}>Default (${this.data.defaultAsString()})</mwc-list-item>
+                ${this.data.values.map((v) => html`<mwc-list-item value="${v}" ?selected=${v === selected}>${v}</mwc-list-item>`)}
+            </mwc-select>
+        `;
     }
 
     validity(s: string): Partial<ValidityState> {
         if (s === "<default>") {
             s = "";
         }
-        return { valid: this.data.valid(s) };
+        return { valid: this.data ? this.data.valid(s) : false };
     }
 
     handleChange(event: Event) {
-        if (!this.field || !this.field.validity.valid) {
+        if (!this.data || !this.field || !this.field.validity.valid) {
             console.log("invalid value");
             return;
         }
         const v = this.field.value === "<default>" ? "" : this.field.value;
         this.data.setFromString(v);
-        this.dispatchEvent(new CustomEvent("mui-value-change", { bubbles: true }));
     }
 }
 
-// type Plop = Extract<Parameters[keyof Parameters], extends Container<infer T> >;
-// type T = Container<A>
-
 // Hold all parameters that Marzipan can accept.
 export class Parameters {
+    public event: EventTarget;
+
     public address = new StringContainer({
         caption: "Address",
         default: "/_generator",
-        event: this.event,
     });
     public maxiter = new PositiveIntContainer({
         caption: "Max iterations",
         default: 100,
-        event: this.event,
     });
     public type = new EnumContainer({
         caption: "Fractal type",
         default: "mandelbrot",
         values: ["mandelbrot", "julia"],
-        event: this.event,
     });
 
     public x = new FloatContainer({
         caption: "Center X",
         default: -0.5,
-        event: this.event,
     });
     public y = new FloatContainer({
         caption: "Center Y",
         default: 0,
-        event: this.event,
     });
     public size = new FloatContainer({
         caption: "Size",
         default: 3.0,
-        event: this.event,
     });
     public ratio = new FloatContainer({
         caption: "Ratio",
         default: 1.0,
-        event: this.event,
     });
     public pixels = new PositiveIntContainer({
         caption: "Pixels",
         default: 900,
-        event: this.event,
     });
 
     public extra = new StringContainer({
         caption: "Extra query args",
         default: "",
-        event: this.event,
     });
 
     left(): number { return this.x.get() - 0.5 * this.size.get(); }
@@ -369,7 +406,14 @@ export class Parameters {
     top(): number { return this.y.get() - 0.5 * this.size.get() / this.ratio.get(); }
     bottom(): number { return this.y.get() + 0.5 * this.size.get() / this.ratio.get(); }
 
-    constructor(private event?: EventTarget) { }
+    constructor() {
+        this.event = new EventTarget();
+        for (const [name, prop] of this.props()) {
+            prop.event.addEventListener('mui-value-change', (e) => {
+                this.event.dispatchEvent(new CustomEvent("mui-value-change", { bubbles: true }));
+            });
+        }
+    }
 
     *props() {
         for (const name of Object.getOwnPropertyNames(this)) {
