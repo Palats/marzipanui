@@ -54,11 +54,16 @@ export class MarzipanUi extends LitElement {
   // timeoutID.
   private reloadTimer: ReturnType<typeof setTimeout> | undefined;
 
+  // Latest image we're trying to load.
+  private loadingImg: HTMLImageElement | undefined;
+
   private canvasFromFractal: DOMMatrixReadOnly | undefined;
 
   // Apply an extra transform of the obtained images - allow for scrolling &
   // changes before a new complete image is loaded.
-  private extraTransform = new DOMMatrixReadOnly();
+  private localTransform = new DOMMatrixReadOnly();
+  // Apply an extra transform while moving around with drag'n'drop.
+  private tempTransform = new DOMMatrixReadOnly();
 
   static styles = css`
     .checkered {
@@ -196,21 +201,39 @@ export class MarzipanUi extends LitElement {
     const newParams = new params.Parameters();
     newParams.copyFrom(this.params);
 
-    console.log("update image:", newURL);
+    console.log("load image:", newURL);
     const q = newParams.query();
     history.pushState(null, "", q ? '?' + q : '');
 
+    // If there is already a image being loaded, cancelling it as we can.
+    if (this.loadingImg) {
+      this.loadingImg.src = "";
+    }
+
     const loadingImg = document.createElement("img");
     loadingImg.src = newURL;
+    this.loadingImg = loadingImg;
     loadingImg.addEventListener("load", evt => {
+      if (this.loadingImg !== loadingImg) {
+        // Leave more recent load attempt go through instead.
+        return;
+      }
+      this.loadingImg = undefined;
+      console.log("image loaded", newURL);
+
       this.currentImg = loadingImg;
       this.currentParams = newParams;
-      this.extraTransform = new DOMMatrixReadOnly();
+      this.localTransform = new DOMMatrixReadOnly();
       this.redraw();
       this.imgError?.close();
       this.progress?.close();
     });
     loadingImg.addEventListener("error", evt => {
+      if (this.loadingImg !== loadingImg) {
+        // Leave more recent load attempt go through instead.
+        return;
+      }
+      this.loadingImg = undefined;
       console.log("error");
       this.imgError?.show();
       this.progress?.close();
@@ -251,7 +274,8 @@ export class MarzipanUi extends LitElement {
       .scale(scale)
       // Topleft of the data should be (0, 0).
       .translate(-fPos.x, -fPos.y)
-      .multiply(this.extraTransform);
+      .multiply(this.localTransform)
+      .multiply(this.tempTransform);
 
     const fractalFromFractalImg = (new DOMMatrixReadOnly())
       // (0, 0) in image space is fPos in fractal space.
@@ -316,13 +340,20 @@ export class MarzipanUi extends LitElement {
     this.transform(resize);
   }
 
-  transform(tr: DOMMatrixReadOnly) {
+  transform(deltaTr: DOMMatrixReadOnly) {
     if (!this.currentParams) {
       return;
     }
-    if (tr.isIdentity) {
+
+    // We transform compared to existing image - so we need to apply all of
+    // local transform + the one we're adding.
+    this.localTransform = this.localTransform.multiply(deltaTr.inverse());
+
+    if (this.localTransform.isIdentity) {
       return;
     }
+
+    const tr = this.localTransform.inverse();
 
     const center = tr.transformPoint(new DOMPointReadOnly(this.currentParams.x.get(), this.currentParams.y.get()));
     this.params.x.set(center.x);
@@ -333,7 +364,6 @@ export class MarzipanUi extends LitElement {
     const sizeVec = tr.transformPoint(new DOMPointReadOnly(this.currentParams.size.get(), 0, 0, 0));
     this.params.size.set(sizeVec.x);
 
-    this.extraTransform = tr.inverse();
     this.redraw();
   }
 
@@ -370,6 +400,7 @@ export class MarzipanUi extends LitElement {
     event.preventDefault();
     const tr = this.calcScroll(event);
     this.imgscrollOrigin = undefined;
+    this.tempTransform = new DOMMatrixReadOnly();
     this.transform(tr);
   }
 
@@ -380,7 +411,7 @@ export class MarzipanUi extends LitElement {
 
     event.preventDefault();
     const tr = this.calcScroll(event);
-    this.extraTransform = tr.inverse();
+    this.tempTransform = tr.inverse();
     this.redraw();
   }
 
@@ -389,7 +420,7 @@ export class MarzipanUi extends LitElement {
       return;
     }
     this.imgscrollOrigin = undefined;
-    this.extraTransform = new DOMMatrixReadOnly();
+    this.tempTransform = new DOMMatrixReadOnly();
     this.redraw();
   }
 
