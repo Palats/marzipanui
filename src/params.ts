@@ -92,22 +92,22 @@ abstract class Container<T> {
         this.event.dispatchEvent(new CustomEvent("mui-value-change", { bubbles: true }));
     }
 
-    getAsString(): string { return this.toString(this.get()); }
+    getAsString(): string { return this.encodeString(this.get()); }
     maybeAsString(): string | undefined {
         const v = this.maybe();
         if (v === undefined) {
             return undefined;
         }
-        return this.toString(v);
+        return this.encodeString(v);
     };
-    defaultAsString(): string { return this.toString(this.default()); }
+    defaultAsString(): string { return this.encodeString(this.default()); }
     setFromString(v: string): void {
-        const x = this.fromString(v);
+        const x = this.decodeString(v);
+        if (x === undefined) {
+            this.reset();
+            return;
+        }
         if (x instanceof Invalid) {
-            if (v == "") {
-                this.reset();
-                return;
-            }
             throw new Error(`cannot set from string "${v}"`);
         }
         this.set(x);
@@ -116,7 +116,7 @@ abstract class Container<T> {
     // Indicates if the provided string is valid or empty.
     // This uses `fromString` to determine validity.
     valid(v: string): boolean {
-        const x = this.fromString(v);
+        const x = this.decodeString(v);
         return v == "" || !(x instanceof Invalid);
     }
 
@@ -127,39 +127,41 @@ abstract class Container<T> {
     // is supported, it should return the corresponding type - otherwise it
     // should return invalid. Some other part might decide then to consider
     // "empty string" as a way to reset to default.
-    abstract fromString(v: string): T | Invalid;
+    abstract decodeString(v: string): T | undefined | Invalid;
     // Create a string from the value; returned value should work if sent to
     // fromString.
-    abstract toString(v: T): string;
+    abstract encodeString(v: T): string;
 }
 
 class StringContainer extends Container<string> {
-    fromString(v: string): string | Invalid {
+    decodeString(v: string): string | undefined | Invalid {
         if (v === "") {
-            return new Invalid("empty string");
+            return undefined;
         }
         return v;
     }
-    toString(v: string): string { return v; }
+    encodeString(v: string): string { return v; }
 
-    render() { return html`<mui-edit-string .data="${this}"></mui-edit-string>`; }
+    render() { return html`<mui-edit-string .data="${this as any}"></mui-edit-string>`; }
 }
 
 class FloatContainer extends Container<number> {
-    fromString(v: string): number | Invalid {
+    decodeString(v: string): number | undefined | Invalid {
+        if (v === "") { return undefined; }
         const x = parseFloat(v);
         if (isNaN(x)) {
             return new Invalid("invalid number");
         }
         return x;
     }
-    toString(v: number): string { return v.toString(); }
+    encodeString(v: number): string { return v.toString(); }
 
-    render() { return html`<mui-edit-number .data="${this}"></mui-edit-number>`; }
+    render() { return html`<mui-edit-number .data="${this as any}"></mui-edit-number>`; }
 }
 
 class PositiveIntContainer extends Container<number> {
-    fromString(v: string): number | Invalid {
+    decodeString(v: string): number | undefined | Invalid {
+        if (v === "") { return undefined; }
         const x = parseInt(v, 10);
         if (isNaN(x)) {
             return new Invalid("not a number");
@@ -169,9 +171,9 @@ class PositiveIntContainer extends Container<number> {
         }
         return x;
     }
-    toString(v: number): string { return v.toString(); }
+    encodeString(v: number): string { return v.toString(); }
 
-    render() { return html`<mui-edit-number .data="${this}"></mui-edit-number>`; }
+    render() { return html`<mui-edit-number .data="${this as any}"></mui-edit-number>`; }
 }
 
 interface EnumInit extends ContainerInit<string> {
@@ -186,24 +188,21 @@ class EnumContainer extends Container<string> {
         this.values = init.values;
     }
 
-    fromString(v: string): string | Invalid {
+    decodeString(v: string): string | undefined | Invalid {
+        if (v === "" || v === "<default>") { return undefined; }
         if (this.values.indexOf(v) < 0) {
             return new Invalid(`invalid value '${v}`);
         }
         return v;
     }
-    toString(v: string): string { return v; }
+    encodeString(v: string): string { return v; }
 
-    render() { return html`<mui-edit-enum .data="${this}"></mui-edit-enum>`; }
+    render() { return html`<mui-edit-enum .data="${this as any}"></mui-edit-enum>`; }
 }
 
-@customElement('mui-edit-number')
-class EditNumber extends LitElement {
+abstract class BaseEditContainer<T extends Container<any>> extends LitElement {
     @property({ type: Object })
-    data: Container<any> | undefined;
-
-    @query('#field')
-    field: TextField | undefined;
+    data: T | undefined;
 
     private unregister: () => void = () => { };
 
@@ -219,6 +218,16 @@ class EditNumber extends LitElement {
             }
         }
     }
+
+    validity(s: string): Partial<ValidityState> {
+        return { valid: this.data ? this.data.valid(s) : false };
+    }
+}
+
+@customElement('mui-edit-number')
+class EditNumber extends BaseEditContainer<FloatContainer> {
+    @query('#field')
+    field: TextField | undefined;
 
     render() {
         if (!this.data) { return html``; }
@@ -237,11 +246,6 @@ class EditNumber extends LitElement {
         `;
     }
 
-    validity(s: string): Partial<ValidityState> {
-        console.log("validity");
-        return { valid: this.data ? this.data.valid(s) : false };
-    }
-
     handleChange(event: Event) {
         if (!this.data || !this.field || !this.field.validity.valid) {
             console.log("invalid value");
@@ -252,27 +256,9 @@ class EditNumber extends LitElement {
 }
 
 @customElement('mui-edit-string')
-class EditString<T> extends LitElement {
-    @property({ type: Object })
-    data: StringContainer | undefined;
-
+class EditString extends BaseEditContainer<StringContainer> {
     @query('#field')
     field: TextField | undefined;
-
-    private unregister: () => void = () => { };
-
-    updated(changedProperties: PropertyValues) {
-        if (changedProperties.get("data") === this.data) { return; }
-        this.unregister();
-        if (this.data) {
-            const f = () => this.requestUpdate();
-            this.data.event.addEventListener("mui-value-change", f);
-            this.unregister = () => {
-                this.data?.event.removeEventListener("mui-value-change", f);
-                this.unregister = () => { };
-            }
-        }
-    }
 
     render() {
         if (!this.data) { return html``; }
@@ -288,10 +274,6 @@ class EditString<T> extends LitElement {
         `;
     }
 
-    validity(s: string): Partial<ValidityState> {
-        return { valid: this.data ? this.data.valid(s) : false };
-    }
-
     handleChange(event: Event) {
         if (!this.data || !this.field || !this.field.validity.valid) {
             console.log("invalid value");
@@ -303,27 +285,9 @@ class EditString<T> extends LitElement {
 
 
 @customElement('mui-edit-enum')
-class EditEnum extends LitElement {
-    @property({ type: Object })
-    data: EnumContainer | undefined;
-
+class EditEnum extends BaseEditContainer<EnumContainer> {
     @query('#field')
     field: TextField | undefined;
-
-    private unregister: () => void = () => { };
-
-    updated(changedProperties: PropertyValues) {
-        if (changedProperties.get("data") === this.data) { return; }
-        this.unregister();
-        if (this.data) {
-            const f = () => this.requestUpdate();
-            this.data.event.addEventListener("mui-value-change", f);
-            this.unregister = () => {
-                this.data?.event.removeEventListener("mui-value-change", f);
-                this.unregister = () => { };
-            }
-        }
-    }
 
     render() {
         if (!this.data) { return html``; }
@@ -340,20 +304,12 @@ class EditEnum extends LitElement {
         `;
     }
 
-    validity(s: string): Partial<ValidityState> {
-        if (s === "<default>") {
-            s = "";
-        }
-        return { valid: this.data ? this.data.valid(s) : false };
-    }
-
     handleChange(event: Event) {
         if (!this.data || !this.field || !this.field.validity.valid) {
             console.log("invalid value");
             return;
         }
-        const v = this.field.value === "<default>" ? "" : this.field.value;
-        this.data.setFromString(v);
+        this.data.setFromString(this.field.value);
     }
 }
 
