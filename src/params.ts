@@ -321,8 +321,8 @@ export class Parameters {
 
     public presets = new EnumContainer({
         caption: "Preset",
-        default: "Base Mandelbrot",
-        values: [...Presets.keys()],
+        default: defaultPreset,
+        values: [...presets.keys()],
     });
 
     public address = new StringContainer({
@@ -461,7 +461,7 @@ export class Parameters {
     }
 
     applyPreset(reset: boolean) {
-        const preset = Presets.get(this.presets.get());
+        const preset = presets.get(this.presets.get());
         if (!preset) {
             console.log("unknown preset", this.presets.get());
             return;
@@ -482,8 +482,10 @@ type ParametersValues = {
     [P in keyof Parameters]?: Parameters[P] extends Container<infer T> ? T : never;
 }
 
-export const Presets: Map<string, ParametersValues> = new Map([
-    ["Base Mandelbrot", {
+const defaultPreset = "Mandelbrot"
+
+const presets: Map<string, ParametersValues> = new Map([
+    ["Mandelbrot", {
         type: "mandelbrot",
         x: -0.5,
         y: 0,
@@ -491,7 +493,7 @@ export const Presets: Map<string, ParametersValues> = new Map([
         maxiter: 100,
         extra: "",
     }],
-    ["Base Julia", {
+    ["Julia", {
         type: "julia",
         x: 0,
         y: 0,
