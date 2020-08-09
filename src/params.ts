@@ -60,9 +60,7 @@ abstract class Container<T> {
             return;
         }
         this.__default = v;
-        if (this.maybe() === undefined) {
-            this.__notify();
-        }
+        this.__notify();
     }
 
     // Unset the value.
@@ -210,13 +208,17 @@ abstract class BaseEditContainer<T extends Container<any>> extends LitElement {
         if (changedProperties.get("data") === this.data) { return; }
         this.unregister();
         if (this.data) {
-            const f = () => this.requestUpdate();
+            const f = () => this.dataChange();
             this.data.event.addEventListener("mui-value-change", f);
             this.unregister = () => {
                 this.data?.event.removeEventListener("mui-value-change", f);
                 this.unregister = () => { };
             }
         }
+    }
+
+    dataChange() {
+        this.requestUpdate();
     }
 
     validity(s: string): Partial<ValidityState> {
@@ -231,13 +233,12 @@ class EditNumber extends BaseEditContainer<FloatContainer> {
 
     render() {
         if (!this.data) { return html``; }
-
         return html`
             <mwc-textfield
                 id='field'
                 label="${this.data.caption}"
                 placeholder="${this.data.defaultAsString()}"
-                value="${ifDefined(this.data.maybeAsString())}"
+                value="${this.data.maybeAsString() ?? ""}"
                 @change="${this.handleChange}"
                 .validityTransform="${(s: string) => this.validity(s)}"
                 validationMessage="Invalid value"
@@ -267,7 +268,7 @@ class EditString extends BaseEditContainer<StringContainer> {
                 id='field'
                 label="${this.data.caption}"
                 placeholder="${this.data.defaultAsString()}"
-                value="${ifDefined(this.data.maybeAsString())}"
+                value="${this.data.maybeAsString() ?? ""}"
                 .validityTransform="${(s: string) => this.validity(s)}"
                 @change="${this.handleChange}">
             </mwc-textfield>
@@ -292,13 +293,14 @@ class EditEnum extends BaseEditContainer<EnumContainer> {
     render() {
         if (!this.data) { return html``; }
         const selected = this.data.maybe();
+
         return html`
             <mwc-select
                 id='field'
                 label="${this.data.caption}"
                 .validityTransform="${(s: string) => this.validity(s)}"
                 @change="${this.handleChange}">
-                <mwc-list-item value="<default>" ?selected=${selected === undefined}>Default (${this.data.defaultAsString()})</mwc-list-item>
+                <mwc-list-item value="<default>" ?selected=${selected === undefined}>Default (${this.data.default()})</mwc-list-item>
                 ${this.data.values.map((v) => html`<mwc-list-item value="${v}" ?selected=${v === selected}>${v}</mwc-list-item>`)}
             </mwc-select>
         `;
@@ -316,6 +318,12 @@ class EditEnum extends BaseEditContainer<EnumContainer> {
 // Hold all parameters that Marzipan can accept.
 export class Parameters {
     public event: EventTarget;
+
+    public presets = new EnumContainer({
+        caption: "Preset",
+        default: "Base Mandelbrot",
+        values: [...Presets.keys()],
+    });
 
     public address = new StringContainer({
         caption: "Address",
@@ -377,7 +385,7 @@ export class Parameters {
             if (!(prop instanceof Container)) {
                 continue;
             }
-            yield [name, prop] as [string, Container<any>];
+            yield [name, prop] as [keyof Parameters, Container<any>];
         }
     }
 
@@ -449,5 +457,46 @@ export class Parameters {
             }
             prop.setFromString(v);
         }
+        this.applyPreset(/*reset*/ false);
+    }
+
+    applyPreset(reset: boolean) {
+        const preset = Presets.get(this.presets.get());
+        if (!preset) {
+            console.log("unknown preset", this.presets.get());
+            return;
+        }
+        for (const [name, prop] of this.props()) {
+            const v = preset[name];
+            if (v === undefined) { continue; }
+            (this[name] as Container<any>).setDefault(v);
+            if (reset) {
+                (this[name] as Container<any>).reset();
+            }
+        }
     }
 }
+
+// An object with the same container fields as Parameters, but with direct values.
+type ParametersValues = {
+    [P in keyof Parameters]?: Parameters[P] extends Container<infer T> ? T : never;
+}
+
+export const Presets: Map<string, ParametersValues> = new Map([
+    ["Base Mandelbrot", {
+        type: "mandelbrot",
+        x: -0.5,
+        y: 0,
+        size: 3,
+        maxiter: 100,
+        extra: "",
+    }],
+    ["Base Julia", {
+        type: "julia",
+        x: 0,
+        y: 0,
+        size: 3,
+        maxiter: 100,
+        extra: "palette=black,blue,red",
+    }],
+]);

@@ -14,6 +14,7 @@ import { Drawer } from '@material/mwc-drawer';
 import { LinearProgress } from '@material/mwc-linear-progress';
 
 import * as params from './params';
+import { SelectedEvent, isEventMulti } from '@material/mwc-list/mwc-list-foundation';
 
 // Coordinate spaces:
 //   fractal space: coordinate used to calculate the fractal (top/left/bottom/right are in fractal space).
@@ -87,9 +88,16 @@ export class MarzipanUi extends LitElement {
   }
 
   render() {
+    const presetSelected = this.params.presets.get();
     return html`
       <mwc-drawer type="dismissible" id="drawer">
         <div>
+          <h4>Preset</h4>
+          <mwc-select
+                id='preset'
+                @action="${this.handlePreset}">
+                ${this.params.presets.values.map((v) => html`<mwc-list-item value="${v}" ?selected=${v === presetSelected}>${v}</mwc-list-item>`)}
+          </mwc-select>
           <h4>Fractal</h4>
           <div>
           ${this.params.type.render()}
@@ -383,5 +391,15 @@ export class MarzipanUi extends LitElement {
     this.imgscrollOrigin = undefined;
     this.extraTransform = new DOMMatrixReadOnly();
     this.redraw();
+  }
+
+  handlePreset(e: SelectedEvent) {
+    if (isEventMulti(e)) {
+      console.log("unsupported");
+      return;
+    }
+    const v = this.params.presets.values[e.detail.index];
+    this.params.presets.setFromString(v);
+    this.params.applyPreset(/*reset*/ true);
   }
 }
