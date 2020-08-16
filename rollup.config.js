@@ -22,6 +22,7 @@ const baseConfig = createSpaConfig({
 
   html: {
     transform: (content, args) => {
+      content = content.replace("./node_modules/@shoelace-style/shoelace/dist/shoelace/icons", "/icons");
       content = content.replace("./node_modules/@shoelace-style/shoelace/dist/shoelace/shoelace.css", "/shoelace.css");
       return content;
     }

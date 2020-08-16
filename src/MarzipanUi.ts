@@ -16,12 +16,13 @@ import { LinearProgress } from '@material/mwc-linear-progress';
 import * as params from './params';
 import { SelectedEvent, isEventMulti } from '@material/mwc-list/mwc-list-foundation';
 
-// import '@shoelace-style/shoelace/dist/shoelace/shoelace.css';
-import { setAssetPath, SlButton, SlDropdown } from '@shoelace-style/shoelace/dist/custom-elements/index';
+import { setAssetPath, defineCustomElements } from '@shoelace-style/shoelace/dist/custom-elements/index';
 
-setAssetPath(import.meta.url);
-customElements.define('sl-button', SlButton);
-customElements.define('sl-dropdown', SlDropdown);
+declare var MARZIPANUI_ICONS: string;
+const u = new URL(import.meta.url);
+u.pathname = MARZIPANUI_ICONS;
+setAssetPath(u.toString());
+defineCustomElements();
 
 // Coordinate spaces:
 //   fractal space: coordinate used to calculate the fractal (top/left/bottom/right are in fractal space).
