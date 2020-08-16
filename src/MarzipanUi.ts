@@ -16,6 +16,13 @@ import { LinearProgress } from '@material/mwc-linear-progress';
 import * as params from './params';
 import { SelectedEvent, isEventMulti } from '@material/mwc-list/mwc-list-foundation';
 
+// import '@shoelace-style/shoelace/dist/shoelace/shoelace.css';
+import { setAssetPath, SlButton, SlDropdown } from '@shoelace-style/shoelace/dist/custom-elements/index';
+
+setAssetPath(import.meta.url);
+customElements.define('sl-button', SlButton);
+customElements.define('sl-dropdown', SlDropdown);
+
 // Coordinate spaces:
 //   fractal space: coordinate used to calculate the fractal (top/left/bottom/right are in fractal space).
 //   fractal image space: pixel coordinate when rendering - (top, left) of fractal space is (0, 0).
