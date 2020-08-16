@@ -1,5 +1,6 @@
 import merge from 'deepmerge';
 import { createSpaConfig } from '@open-wc/building-rollup';
+import analyze from 'rollup-plugin-analyzer'
 
 import path from 'path';
 import copy from 'rollup-plugin-copy';
@@ -35,6 +36,11 @@ export default merge(baseConfig, {
   input: './index.html',
 
   plugins: [
+    analyze({
+      summaryOnly: true,
+      // Unfortunately, it also impacts the total, not just the list.
+      limit: 10,
+    }),
     copy({
       targets: [{
         src: [
