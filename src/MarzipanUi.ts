@@ -1,17 +1,8 @@
-import { LitElement, html, css, property, customElement, query } from 'lit-element';
+import { LitElement, html, css, property, customElement, query, internalProperty } from 'lit-element';
 
-import '@material/mwc-top-app-bar';
-import '@material/mwc-drawer';
-import '@material/mwc-icon-button';
-import '@material/mwc-icon';
-import '@material/mwc-switch';
-import '@material/mwc-formfield';
 import '@material/mwc-snackbar';
-import '@material/mwc-linear-progress';
 
 import { Snackbar } from '@material/mwc-snackbar';
-import { Drawer } from '@material/mwc-drawer';
-import { LinearProgress } from '@material/mwc-linear-progress';
 
 import * as params from './params';
 
@@ -36,10 +27,6 @@ export class MarzipanUi extends LitElement {
   @query('#imgError')
   private imgError: Snackbar | undefined;
 
-  // The element to display loading in progress.
-  @query('#progress')
-  private progress: LinearProgress | undefined;
-
   // The canvas where to render the fractal.
   @query('#canvas')
   private canvas: HTMLCanvasElement | undefined;
@@ -53,6 +40,12 @@ export class MarzipanUi extends LitElement {
 
   @property({ attribute: false })
   private currentImg: HTMLImageElement | undefined;
+
+  @internalProperty()
+  private loading = false;
+
+  @internalProperty()
+  private drawerOpen = true;
 
   // Parameters to use matching the `currentImg`.
   private currentParams: params.Parameters | undefined;
@@ -86,10 +79,46 @@ export class MarzipanUi extends LitElement {
       background-position:0 0, 10px 0, 10px -10px, 0px 10px;
     }
 
+    .topbar {
+      background-color: #75acff;
+      height: 40px;
+      font-size: 20px;
+      color: #f8f8f8;
+      align-items: center;
+      display: flex;
+      flex-flow: row nowrap;
+    }
+
     sl-details::part(header) {
       font-style: italic;
       background-color: #f2f2f2;
       height: 2ex;
+    }
+
+    sl-drawer {
+      --size: 320px;
+    }
+    sl-drawer::part(overlay) {
+      --sl-overlay-background-color: #00000000;
+      pointer-events: none;
+    }
+    sl-drawer::part(body) {
+      padding: 0;
+    }
+
+    #drawer-button {
+      padding-left: 4px;padding-right: 4px;
+    }
+    #drawer-button::part(base) {
+      background-color: #dbe9ff;
+    }
+    #drawer-button::part(label) {
+      display: flex;
+      align-items: center;
+      font-size: 16px;
+    }
+    #drawer-button::part(suffix) {
+      font-size: 16px;
     }
   `
   constructor() {
@@ -111,39 +140,53 @@ export class MarzipanUi extends LitElement {
   render() {
     const presetSelected = this.params.presets.get();
     return html`
-      <mwc-drawer type="dismissible" id="drawer">
-        <div>
-          <sl-details open summary="Preset">
-          <sl-select
-            id='preset'
-            size="small"
-            @slChange="${this.handlePreset}"
-            value="${presetSelected}">
-            ${this.params.presets.values.map((v) => html`<sl-menu-item value="${v}">${v}</sl-menu-item>`)}
-          </sl-select>
-          </sl-details>
-          <sl-details summary="View window" open>
-            ${this.params.x.render()}
-            ${this.params.y.render()}
-            ${this.params.size.render()}
-            ${this.params.ratio.render()}
-          </sl-details>
-          <sl-details summary="Rendering" open>
-            ${this.params.type.render()}
-            ${this.params.maxiter.render()}
-            ${this.params.pixels.render()}
-          </sl-details>
-          <sl-details summary="Network" open>
-            ${this.params.extra.render()}
-            ${this.params.address.render()}
-          </sl-details>
+      <div style="height:100%; display: flex; flex-flow: column nowrap;" class="checkered">
+        <div class="topbar">
+        <sl-button
+          id="drawer-button"
+          type="default"
+          size="small"
+          @click=${() => { this.drawerOpen = !this.drawerOpen }}
+          pill>
+          <sl-icon name="gear"></sl-icon>
+          <sl-icon name=${this.drawerOpen ? "chevron-up" : "chevron-down"} slot="suffix"></sl-icon>
+        </sl-button>
+          <div style="padding-left: 10px; padding-right: 16px;">Marzipan</div>
+          ${this.loading ? html`<sl-spinner  style="font-size: 1.7rem; --stroke-width: 3px;"></sl-spinner>` : ``}
         </div>
-
-        <div slot="appContent" style="height:100%; display: flex; flex-flow: column nowrap;" class="checkered">
-          <mwc-top-app-bar id="appbar">
-            <mwc-icon-button slot="navigationIcon" icon="menu"></mwc-icon-button>
-            <div slot="title">Marzipan</div>
-          </mwc-top-app-bar>
+        <div style="width: 100%; flex-grow: 1; display: flex; flex-flow: column nowrap; position: relative;">
+            <sl-drawer
+              label="Drawer"
+              contained
+              class="drawer-contained drawer-scrolling"
+              no-header
+              ?open=${this.drawerOpen}
+              placement="left">
+            <sl-details open summary="Preset">
+            <sl-select
+              id='preset'
+              size="small"
+              @slChange="${this.handlePreset}"
+              value="${presetSelected}">
+              ${this.params.presets.values.map((v) => html`<sl-menu-item value="${v}">${v}</sl-menu-item>`)}
+            </sl-select>
+            </sl-details>
+            <sl-details summary="View window" open>
+              ${this.params.x.render()}
+              ${this.params.y.render()}
+              ${this.params.size.render()}
+              ${this.params.ratio.render()}
+            </sl-details>
+            <sl-details summary="Rendering" open>
+              ${this.params.type.render()}
+              ${this.params.maxiter.render()}
+              ${this.params.pixels.render()}
+            </sl-details>
+            <sl-details summary="Network" open>
+              ${this.params.extra.render()}
+              ${this.params.address.render()}
+            </sl-details>
+          </sl-drawer>
           <canvas
             id="canvas"
             style="width: 100%; flex-grow: 1;"
@@ -156,28 +199,20 @@ export class MarzipanUi extends LitElement {
             @mouseout="${this.handleMouseOut}"
           >
           </canvas>
-          <mwc-linear-progress id="progress" indeterminate></mwc-linear-progress>
-          <mwc-snackbar id="imgError" labelText="Unable to load fractal image.">
-            <mwc-icon-button icon="close" slot="dismiss"></mwc-icon-button>
-          </mwc-snackbar>
-          ${this.currentImg ? html`
-            <div style="position: absolute; bottom: 3px; right: 10px;">
-              <a href="${this.currentImg?.src}" target="_blank"><mwc-icon>open_in_new</mwc-icon></a>
-            </div>
-          ` : ``}
         </div>
-      </mwc-drawer>
+      </div>
+      <mwc-snackbar id="imgError" labelText="Unable to load fractal image.">
+        <mwc-icon-button icon="close" slot="dismiss"></mwc-icon-button>
+      </mwc-snackbar>
+      ${this.currentImg ? html`
+          <div style="position: absolute; bottom: 3px; right: 10px;">
+            <a href="${this.currentImg?.src}" target="_blank"><sl-icon name="box-arrow-up-right"></sl-icon></a>
+          </div>
+      ` : ``}
     `;
   }
 
   firstUpdated(changedProperties: any) {
-    // Open the drawer by default and connect the corresponding button to it.
-    const drawer = this.shadowRoot?.getElementById('drawer') as Drawer;
-    drawer.open = true;
-    this.shadowRoot?.addEventListener('MDCTopAppBar:nav', () => {
-      drawer.open = !drawer.open;
-    });
-
     (new ResizeObserver(entries => {
       const canvas = this.canvas;
       if (!canvas) { return; }
@@ -239,7 +274,7 @@ export class MarzipanUi extends LitElement {
       this.localTransform = new DOMMatrixReadOnly();
       this.redraw();
       this.imgError?.close();
-      this.progress?.close();
+      this.loading = false;
     });
     loadingImg.addEventListener("error", evt => {
       if (this.loadingImg !== loadingImg) {
@@ -249,11 +284,11 @@ export class MarzipanUi extends LitElement {
       this.loadingImg = undefined;
       console.log("error");
       this.imgError?.show();
-      this.progress?.close();
+      this.loading = false;
     });
 
     this.imgError?.close();
-    this.progress?.open();
+    this.loading = true;
   }
 
   redraw() {
