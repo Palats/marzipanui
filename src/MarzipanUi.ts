@@ -14,9 +14,8 @@ import { Drawer } from '@material/mwc-drawer';
 import { LinearProgress } from '@material/mwc-linear-progress';
 
 import * as params from './params';
-import { SelectedEvent, isEventMulti } from '@material/mwc-list/mwc-list-foundation';
 
-import { setAssetPath, defineCustomElements } from '@shoelace-style/shoelace/dist/custom-elements/index';
+import { setAssetPath, defineCustomElements, Components } from '@shoelace-style/shoelace/dist/custom-elements/index';
 
 declare var MARZIPANUI_ICONS: string;
 const u = new URL(import.meta.url);
@@ -44,6 +43,9 @@ export class MarzipanUi extends LitElement {
   // The canvas where to render the fractal.
   @query('#canvas')
   private canvas: HTMLCanvasElement | undefined;
+
+  @query('#preset')
+  private preset: Components.SlSelect | undefined;
 
   // Rendering parameters of the fractal. Those are the current one visible on
   // the UI; those used for rendering are available in `currentParams`.
@@ -83,6 +85,12 @@ export class MarzipanUi extends LitElement {
       background-size: 20px 20px;
       background-position:0 0, 10px 0, 10px -10px, 0px 10px;
     }
+
+    sl-details::part(header) {
+      font-style: italic;
+      background-color: #f2f2f2;
+      height: 2ex;
+    }
   `
   constructor() {
     super();
@@ -105,33 +113,30 @@ export class MarzipanUi extends LitElement {
     return html`
       <mwc-drawer type="dismissible" id="drawer">
         <div>
-          <h4>Preset</h4>
-          <mwc-select
-                id='preset'
-                @action="${this.handlePreset}">
-                ${this.params.presets.values.map((v) => html`<mwc-list-item value="${v}" ?selected=${v === presetSelected}>${v}</mwc-list-item>`)}
-          </mwc-select>
-          <h4>Fractal</h4>
-          <div>
-          ${this.params.type.render()}
-          </div>
-          <h4>Position</h4>
-          <div>
+          <sl-details open summary="Preset">
+          <sl-select
+            id='preset'
+            size="small"
+            @slChange="${this.handlePreset}"
+            value="${presetSelected}">
+            ${this.params.presets.values.map((v) => html`<sl-menu-item value="${v}">${v}</sl-menu-item>`)}
+          </sl-select>
+          </sl-details>
+          <sl-details summary="View window" open>
             ${this.params.x.render()}
             ${this.params.y.render()}
             ${this.params.size.render()}
             ${this.params.ratio.render()}
-          </div>
-          <h4>Rendering</h4>
-          <div>
+          </sl-details>
+          <sl-details summary="Rendering" open>
+            ${this.params.type.render()}
             ${this.params.maxiter.render()}
             ${this.params.pixels.render()}
-          </div>
-          <h4>Network</h4>
-          <div>
+          </sl-details>
+          <sl-details summary="Network" open>
             ${this.params.extra.render()}
             ${this.params.address.render()}
-          </div>
+          </sl-details>
         </div>
 
         <div slot="appContent" style="height:100%; display: flex; flex-flow: column nowrap;" class="checkered">
@@ -432,13 +437,9 @@ export class MarzipanUi extends LitElement {
     this.redraw();
   }
 
-  handlePreset(e: SelectedEvent) {
-    if (isEventMulti(e)) {
-      console.log("unsupported");
-      return;
-    }
-    const v = this.params.presets.values[e.detail.index];
-    this.params.presets.setFromString(v);
+  handlePreset(e: CustomEvent<any>) {
+    if (!this.preset) { return; }
+    this.params.presets.setFromString(this.preset.value as string);
     this.params.applyPreset(/*reset*/ true);
   }
 }

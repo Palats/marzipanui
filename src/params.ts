@@ -1,12 +1,6 @@
 import { LitElement, html, customElement, query, property, internalProperty, PropertyValues } from 'lit-element';
 import { ifDefined } from 'lit-html/directives/if-defined';
 
-import '@material/mwc-textfield';
-import '@material/mwc-select';
-import '@material/mwc-list/mwc-list-item';
-
-import { TextField } from '@material/mwc-textfield';
-import { assert } from 'console';
 
 // Represents an invalid conversion from string.
 class Invalid {
@@ -100,8 +94,12 @@ abstract class Container<T> {
     };
     defaultAsString(): string { return this.encodeString(this.default()); }
     setFromString(v: string): void {
+        if (v === undefined || v === null) {
+            this.reset();
+            return;
+        }
         const x = this.decodeString(v);
-        if (x === undefined) {
+        if (x === undefined || x === null) {
             this.reset();
             return;
         }
@@ -202,13 +200,21 @@ abstract class BaseEditContainer<T extends Container<any>> extends LitElement {
     @property({ type: Object })
     data: T | undefined;
 
+    @internalProperty()
+    valid = true;
+
+    @query('#field')
+    field: HTMLInputElement | undefined;
+
     private unregister: () => void = () => { };
 
+    // When the element has been updated, subscribe to the container if it has
+    // changed.
     updated(changedProperties: PropertyValues) {
         if (changedProperties.get("data") === this.data) { return; }
         this.unregister();
         if (this.data) {
-            const f = () => this.dataChange();
+            const f = () => this.requestUpdate();
             this.data.event.addEventListener("mui-value-change", f);
             this.unregister = () => {
                 this.data?.event.removeEventListener("mui-value-change", f);
@@ -217,101 +223,92 @@ abstract class BaseEditContainer<T extends Container<any>> extends LitElement {
         }
     }
 
-    dataChange() {
-        this.requestUpdate();
+    handleChange(event: Event) {
+        if (!this.data || !this.field) {
+            return;
+        }
+        console.log(this.field.constructor.name, this.field);
+        var x = this.field.value;
+        if (x === undefined || x === null) {
+            this.data.reset();
+        } else {
+            if (this.data.valid(x)) {
+                this.data.setFromString(x);
+            } else {
+                console.log("invalid value", x);
+            }
+        }
     }
 
-    validity(s: string): Partial<ValidityState> {
-        return { valid: this.data ? this.data.valid(s) : false };
+    handleInput(event: Event) {
+        if (!this.data || !this.field) {
+            return;
+        }
+        this.valid = this.data.valid(this.field.value);
     }
 }
 
 @customElement('mui-edit-number')
 class EditNumber extends BaseEditContainer<FloatContainer> {
-    @query('#field')
-    field: TextField | undefined;
-
     render() {
         if (!this.data) { return html``; }
         return html`
-            <mwc-textfield
+            <sl-input
                 id='field'
                 label="${this.data.caption}"
-                placeholder="${this.data.defaultAsString()}"
+                size="small"
+                placeholder="${this.data.getAsString()}"
                 value="${this.data.maybeAsString() ?? ""}"
-                @change="${this.handleChange}"
-                .validityTransform="${(s: string) => this.validity(s)}"
-                validationMessage="Invalid value"
-                endaligned>
-            </mwc-textfield>
+                @slChange="${this.handleChange}"
+                @slInput="${this.handleInput}"
+                ?invalid=${!this.valid}
+                clearable
+            >
+            </sl-input>
         `;
-    }
-
-    handleChange(event: Event) {
-        if (!this.data || !this.field || !this.field.validity.valid) {
-            console.log("invalid value");
-            return;
-        }
-        this.data.setFromString(this.field.value);
     }
 }
 
 @customElement('mui-edit-string')
 class EditString extends BaseEditContainer<StringContainer> {
-    @query('#field')
-    field: TextField | undefined;
-
     render() {
         if (!this.data) { return html``; }
         return html`
-            <mwc-textfield
+            <sl-input
                 id='field'
                 label="${this.data.caption}"
-                placeholder="${this.data.defaultAsString()}"
+                size="small"
+                placeholder="${this.data.getAsString()}"
                 value="${this.data.maybeAsString() ?? ""}"
-                .validityTransform="${(s: string) => this.validity(s)}"
-                @change="${this.handleChange}">
-            </mwc-textfield>
+                @slChange="${this.handleChange}"
+                @slInput="${this.handleInput}"
+                ?invalid=${!this.valid}
+                clearable
+            >
+            </sl-input>
         `;
-    }
-
-    handleChange(event: Event) {
-        if (!this.data || !this.field || !this.field.validity.valid) {
-            console.log("invalid value");
-            return;
-        }
-        this.data.setFromString(this.field.value);
     }
 }
 
 
 @customElement('mui-edit-enum')
 class EditEnum extends BaseEditContainer<EnumContainer> {
-    @query('#field')
-    field: TextField | undefined;
-
     render() {
         if (!this.data) { return html``; }
         const selected = this.data.maybe();
 
         return html`
-            <mwc-select
+            <sl-select
                 id='field'
                 label="${this.data.caption}"
-                .validityTransform="${(s: string) => this.validity(s)}"
-                @change="${this.handleChange}">
-                <mwc-list-item value="<default>" ?selected=${selected === undefined}>Default (${this.data.default()})</mwc-list-item>
-                ${this.data.values.map((v) => html`<mwc-list-item value="${v}" ?selected=${v === selected}>${v}</mwc-list-item>`)}
-            </mwc-select>
+                size="small"
+                placeholder="${this.data.getAsString()}"
+                @slChange="${this.handleChange}"
+                value="${ifDefined(selected)}">
+                <sl-menu-item><i>default (${this.data.default()})</i></sl-menu-item>
+                ${this.data.values.map((v) => html`<sl-menu-item value="${v}">${v}</sl-menu-item>`)}
+            </sl-select>
         `;
-    }
-
-    handleChange(event: Event) {
-        if (!this.data || !this.field || !this.field.validity.valid) {
-            console.log("invalid value");
-            return;
-        }
-        this.data.setFromString(this.field.value);
     }
 }
 
